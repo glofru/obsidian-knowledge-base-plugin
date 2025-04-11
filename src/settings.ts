@@ -8,6 +8,8 @@ enum KBProvider {
 interface AWSBedrockConfiguration {
     region: string;
     knowledgeBaseId: string;
+    s3BucketName: string;
+    s3Prefix: string;
 }
 
 type KBProviderConfiguration = AWSBedrockConfiguration;
@@ -27,6 +29,8 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
     providerConfiguration: {
         region: 'us-west-2',
         knowledgeBaseId: '',
+        s3BucketName: '',
+        s3Prefix: '',
     },
     syncConfiguration: {
         refreshFrequency: 60,
@@ -74,6 +78,42 @@ export class KBSettingTab extends PluginSettingTab {
                     )
                     .onChange(async (value) => {
                         this.plugin.settings.providerConfiguration.knowledgeBaseId =
+                            value;
+                        await this.plugin.saveSettings();
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName('S3 Bucket Name')
+            .setDesc(
+                'The name of the S3 bucket where to store the data for the knowledge base'
+            )
+            .addText((text) =>
+                text
+                    .setPlaceholder('my-knowledge-base-data')
+                    .setValue(
+                        this.plugin.settings.providerConfiguration.s3BucketName
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.providerConfiguration.s3BucketName =
+                            value;
+                        await this.plugin.saveSettings();
+                    })
+            );
+
+        new Setting(containerEl)
+            .setName('S3 Prefix')
+            .setDesc(
+                'The prefix of the folder in the S3 bucket where to store the data'
+            )
+            .addText((text) =>
+                text
+                    .setPlaceholder('data/...')
+                    .setValue(
+                        this.plugin.settings.providerConfiguration.s3Prefix
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.providerConfiguration.s3Prefix =
                             value;
                         await this.plugin.saveSettings();
                     })
@@ -139,6 +179,15 @@ export class KBSettingTab extends PluginSettingTab {
                             value.split(', ');
                         await this.plugin.saveSettings();
                     })
+            );
+
+        new Setting(containerEl)
+            .setName('Sync Now')
+            .setDesc('Manually trigger a sync with the knowledge base')
+            .addButton((button) =>
+                button.setButtonText('Sync').onClick(async () => {
+                    await this.plugin.sync({ allVault: true });
+                })
             );
     }
 
