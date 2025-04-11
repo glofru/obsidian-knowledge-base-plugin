@@ -1,5 +1,6 @@
 import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
 import {
+    DeleteObjectCommand,
     DeleteObjectCommandInput,
     PutObjectCommand,
     PutObjectCommandInput,
@@ -145,12 +146,10 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         return '';
     }
 
-    private async prepareS3Deletions(
-        paths: string[]
-    ): Promise<DeleteObjectCommandInput[]> {
+    private prepareS3Deletions(paths: string[]): DeleteObjectCommandInput[] {
         const deletions: DeleteObjectCommandInput[] = [];
 
-        for (const path in paths) {
+        for (const path of paths) {
             deletions.push({
                 Bucket: this.configuration.s3BucketName,
                 Key: path,
@@ -181,13 +180,16 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         changedFiles,
         deletedFiles,
     }: StartSyncProps) {
-        const deletions = await this.prepareS3Deletions(deletedFiles);
+        console.log(deletedFiles);
+
+        const deletions = this.prepareS3Deletions(deletedFiles);
         const deletionPromises = deletions.map((deletion) =>
-            this.s3Client.send(new PutObjectCommand(deletion))
+            this.s3Client.send(new DeleteObjectCommand(deletion))
         );
 
         try {
             await Promise.all(deletionPromises);
+
             console.log(
                 `Successfully deleted ${deletions.length} files from S3`
             );
