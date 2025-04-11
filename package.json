@@ -14,8 +14,7 @@
 	"dependencies": {
 		"@aws-sdk/client-bedrock-agent": "^3.787.0",
 		"@aws-sdk/client-bedrock-agent-runtime": "^3.787.0",
-		"@aws-sdk/client-s3": "^3.787.0",
-		"@aws-sdk/credential-providers": "^3.787.0"
+		"@aws-sdk/client-s3": "^3.787.0"
 	},
 	"devDependencies": {
 		"@types/node": "^16.11.6",
@@ -24,8 +23,8 @@
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
 		"eslint-config-prettier": "^10.1.1",
-		"eslint-plugin-prettier": "^5.2.6",
 		"eslint-plugin-obsidian": "^2.21.0",
+		"eslint-plugin-prettier": "^5.2.6",
 		"obsidian": "latest",
 		"prettier": "3.5.3",
 		"tslib": "2.4.0",

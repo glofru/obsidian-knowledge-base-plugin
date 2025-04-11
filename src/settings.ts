@@ -1,22 +1,13 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import KnowledgeBasePlugin from './main';
-
-enum KBProvider {
-    AWS_BEDROCK = 'AWS Bedrock',
-}
-
-interface AWSBedrockConfiguration {
-    region: string;
-    knowledgeBaseId: string;
-    s3BucketName: string;
-    s3Prefix: string;
-}
-
-type KBProviderConfiguration = AWSBedrockConfiguration;
+import {
+    KnowledgeBaseConfigurations,
+    KnowledgeBaseProvider,
+} from './knowledge-bases';
 
 export interface KBPluginSettings {
-    provider: KBProvider;
-    providerConfiguration: KBProviderConfiguration;
+    provider: KnowledgeBaseProvider;
+    providerConfiguration: KnowledgeBaseConfigurations;
     syncConfiguration: {
         refreshFrequency: number; // in minutes
         excludedFolders: string[];
@@ -25,7 +16,7 @@ export interface KBPluginSettings {
 }
 
 export const DEFAULT_SETTINGS: KBPluginSettings = {
-    provider: KBProvider.AWS_BEDROCK,
+    provider: KnowledgeBaseProvider.AWS_BEDROCK,
     providerConfiguration: {
         region: 'us-west-2',
         knowledgeBaseId: '',
@@ -202,7 +193,7 @@ export class KBSettingTab extends PluginSettingTab {
             .addDropdown((dropdown) => {
                 dropdown
                     .addOptions(
-                        Object.entries(KBProvider).reduce(
+                        Object.entries(KnowledgeBaseProvider).reduce(
                             (acc, [_, value]) => ({
                                 ...acc,
                                 [value]: value,
@@ -211,14 +202,16 @@ export class KBSettingTab extends PluginSettingTab {
                         )
                     )
                     .setValue(this.plugin.settings.provider)
-                    .onChange(async (value: KBProvider) => {
+                    .onChange(async (value: KnowledgeBaseProvider) => {
                         this.plugin.settings.provider = value;
                         await this.plugin.saveSettings();
                         this.display();
                     });
             });
 
-        if (this.plugin.settings.provider === KBProvider.AWS_BEDROCK) {
+        if (
+            this.plugin.settings.provider === KnowledgeBaseProvider.AWS_BEDROCK
+        ) {
             this.generateAWSBedrockConfiguration(containerEl);
         }
 

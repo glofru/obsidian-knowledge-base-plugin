@@ -1,8 +1,12 @@
 import { TFile } from 'obsidian';
 
+export enum KnowledgeBaseProvider {
+    AWS_BEDROCK = 'AWS Bedrock',
+}
+
 export interface StartSyncProps {
-    changedFiles?: TFile[];
-    deletedFiles?: string[];
+    changedFiles: TFile[];
+    deletedFiles: string[];
 }
 
 export interface StartSyncResponse {
@@ -21,8 +25,6 @@ export interface SyncStatusResponse {
 }
 
 export abstract class KnowledgeBase {
-    constructor(protected knowledgeBaseId: string) {}
-
     abstract startSync(props: StartSyncProps): Promise<StartSyncResponse>;
     abstract getSyncStatus(syncId: string): Promise<SyncStatusResponse>;
 

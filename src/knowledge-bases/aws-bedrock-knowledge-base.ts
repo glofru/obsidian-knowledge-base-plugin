@@ -1,16 +1,11 @@
+import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
 import {
-    BedrockAgentClient,
-    DeleteKnowledgeBaseCommand,
-    GetIngestionJobCommand,
-    StartIngestionJobCommand,
-} from '@aws-sdk/client-bedrock-agent';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { fromEnv } from '@aws-sdk/credential-providers';
-import { AwsCredentialIdentity } from '@aws-sdk/types';
-import {
-    BedrockAgentRuntimeClient,
-    RetrieveCommand,
-} from '@aws-sdk/client-bedrock-agent-runtime';
+    DeleteObjectCommandInput,
+    PutObjectCommand,
+    PutObjectCommandInput,
+    S3Client,
+} from '@aws-sdk/client-s3';
+import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
 import {
     KnowledgeBase,
     StartSyncProps,
@@ -18,18 +13,17 @@ import {
     SyncStatus,
     SyncStatusResponse,
 } from './knowledge-base';
+import { TFile } from 'obsidian';
+
+import * as fs from 'fs';
+import * as os from 'os';
+import { AwsCredentialIdentity } from '@aws-sdk/types';
+import * as path from 'path';
 
 /**
  * Decorator factory that refreshes AWS credentials before method execution
  */
-function refreshAwsCredentials(
-    options: {
-        // Optional configuration for credential refresh
-        profile?: string;
-        region?: string;
-        // Add other options as needed
-    } = {}
-) {
+function refreshAwsCredentials(profile: string) {
     return function (
         target: any,
         propertyKey: string,
@@ -39,23 +33,23 @@ function refreshAwsCredentials(
 
         descriptor.value = async function (...args: any[]) {
             // Refresh the credentials before method execution
-            const credentials = await refreshCredentials(options);
+            const credentials = await refreshCredentials(profile);
 
             // Refresh Bedrock client
             this.bedrockClient = new BedrockAgentClient({
-                region: this.settings.awsRegion,
+                region: this.configuration.region,
                 credentials: credentials,
             });
 
             // Refresh Bedrock Runtime client
             this.bedrockRuntimeClient = new BedrockAgentRuntimeClient({
-                region: this.settings.awsRegion,
+                region: this.configuration.region,
                 credentials: credentials,
             });
 
             // Refresh S3 client
             this.s3Client = new S3Client({
-                region: this.settings.awsRegion,
+                region: this.configuration.region,
                 credentials: credentials,
             });
 
@@ -67,32 +61,60 @@ function refreshAwsCredentials(
     };
 }
 
+const parseIni = (
+    input: string
+): {
+    [key: string]: string | { [key: string]: string };
+} => {
+    const result: { [key: string]: string | { [key: string]: string } } = {};
+    let section = result;
+
+    input.split('\n').forEach((line) => {
+        let match;
+        if ((match = line.match(/^\s*\[\s*([^\]]*)\s*\]\s*$/))) {
+            section = result[match[1]] = {};
+        } else if ((match = line.match(/^\s*([^=]+?)\s*=\s*(.*?)\s*$/))) {
+            section[match[1]] = match[2];
+        }
+    });
+
+    return result;
+};
+
 /**
  * Refresh AWS credentials using the AWS SDK
  */
-async function refreshCredentials(options: {
-    profile?: string;
-    region?: string;
-}): Promise<AwsCredentialIdentity> {
-    try {
-        // Try loading from environment variables first (useful in Lambda, ECS, etc.)
-        const envCredentials = await fromEnv()();
-        if (!envCredentials.accessKeyId) {
-            throw new Error('Failed to load credentials from environment');
+function refreshCredentials(profile: string): AwsCredentialIdentity {
+    const filePath = path.join(os.homedir(), '.aws', 'credentials'); // TODO: make it setting
+
+    if (!fs.existsSync(filePath)) {
+        throw 'Cannot find AWS credentials file';
+    }
+
+    const content = fs.readFileSync(filePath).toString('utf8');
+    const credentialsContent = parseIni(content);
+
+    for (const [profileName, data] of Object.entries(credentialsContent)) {
+        if (profileName !== profile) {
+            continue;
         }
 
-        console.log('AWS credentials loaded from environment');
-        return envCredentials;
-    } catch (error) {
-        console.log('Failed to load credentials from environment:', error);
-        throw new Error(`Failed to refresh AWS credentials: ${error.message}`);
+        const credentialsData = data as any;
+
+        return {
+            accessKeyId: credentialsData.aws_access_key_id,
+            secretAccessKey: credentialsData.aws_secret_access_key,
+            sessionToken: credentialsData.aws_session_token,
+        };
     }
+
+    throw new Error('Cannot find profile in credentials file');
 }
 
-export interface AwsKnowledgeBaseSettings {
-    awsRegion: string;
+export interface AWSBedrockKnowledgeBaseConfiguration {
+    region: string;
     knowledgeBaseId: string;
-    s3Bucket: string;
+    s3BucketName: string;
     s3Prefix: string;
 }
 
@@ -100,12 +122,17 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     private bedrockClient: BedrockAgentClient;
     private bedrockRuntimeClient: BedrockAgentRuntimeClient;
     private s3Client: S3Client;
-    private settings: AwsKnowledgeBaseSettings;
 
+    constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {
+        super();
+    }
+
+    @refreshAwsCredentials('default')
     deleteAllData(): Promise<void> {
         return Promise.resolve(undefined);
     }
 
+    @refreshAwsCredentials('default')
     getSyncStatus(syncId: string): Promise<SyncStatusResponse> {
         return Promise.resolve({
             syncId: 'test',
@@ -113,54 +140,92 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         });
     }
 
+    @refreshAwsCredentials('default')
     query(text: string): string {
         return '';
     }
 
-    startSync(props: StartSyncProps): Promise<StartSyncResponse> {
+    private async prepareS3Deletions(
+        paths: string[]
+    ): Promise<DeleteObjectCommandInput[]> {
+        const deletions: DeleteObjectCommandInput[] = [];
+
+        for (const path in paths) {
+            deletions.push({
+                Bucket: this.configuration.s3BucketName,
+                Key: path,
+            });
+        }
+
+        return deletions;
+    }
+
+    private async prepareS3Changes(
+        files: TFile[]
+    ): Promise<PutObjectCommandInput[]> {
+        const uploads: PutObjectCommandInput[] = [];
+
+        for (const file of files) {
+            const content = await file.vault.read(file);
+            uploads.push({
+                Bucket: this.configuration.s3BucketName,
+                Key: file.path,
+                Body: content,
+            });
+        }
+
+        return uploads;
+    }
+
+    private async uploadChangesToS3({
+        changedFiles,
+        deletedFiles,
+    }: StartSyncProps) {
+        const deletions = await this.prepareS3Deletions(deletedFiles);
+        const deletionPromises = deletions.map((deletion) =>
+            this.s3Client.send(new PutObjectCommand(deletion))
+        );
+
+        try {
+            await Promise.all(deletionPromises);
+            console.log(
+                `Successfully deleted ${deletions.length} files from S3`
+            );
+        } catch (error) {
+            console.error(`Error deleting files from S3:`, error);
+            throw new Error(`Error deleting files from S3: ${error.message}`);
+        }
+
+        const uploads = await this.prepareS3Changes(changedFiles);
+
+        const uploadPromises = uploads.map((upload) =>
+            this.s3Client.send(new PutObjectCommand(upload))
+        );
+
+        try {
+            await Promise.all(uploadPromises);
+            console.log(`Successfully uploaded ${uploads.length} files to S3`);
+        } catch (error) {
+            console.error(`Error uploading files to S3:`, error);
+            throw new Error(`Error uploading files to S3: ${error.message}`);
+        }
+    }
+
+    @refreshAwsCredentials('default')
+    async startSync(props: StartSyncProps): Promise<StartSyncResponse> {
+        await this.uploadChangesToS3(props);
+
         return Promise.resolve({
             syncId: 'test',
         });
     }
 
-    // constructor(settings: AwsKnowledgeBaseSettings) {
-    //     this.settings = settings;
-    // }
-    //
-    // updateSettings(settings: AwsKnowledgeBaseSettings) {
-    //     this.settings = settings;
-    // }
-    //
-    // private async uploadDocumentToS3(
-    //     text: string,
-    //     fileName: string,
-    //     metadata: Record<string, string>
-    // ): Promise<string> {
-    //     try {
-    //         // Create a unique key for the document in S3
-    //         const key = `${this.settings.s3Prefix}/${Date.now()}-${fileName}.txt`;
-    //
-    //         // Upload the document to S3
-    //         const command = new PutObjectCommand({
-    //             Bucket: this.settings.s3Bucket,
-    //             Key: key,
-    //             Body: text,
-    //             Metadata: metadata,
-    //         });
-    //
-    //         await this.s3Client.send(command);
-    //         return `s3://${this.settings.s3Bucket}/${key}`;
-    //     } catch (error) {
-    //         console.error('Error uploading document to S3:', error);
-    //         throw error;
-    //     }
-    // }
     //
     // @refreshAwsCredentials()
     // async startIngestionJob(s3Path: string): Promise<string> {
     //     try {
     //         const command = new StartIngestionJobCommand({
-    //             knowledgeBaseId: this.settings.knowledgeBaseId,
+    //             knowledgeBaseId: this.configuration.knowledgeBaseId,
     //             dataSourceId: 'id',
     //         });
     //
@@ -182,7 +247,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     // async getIngestionJobStatus(ingestionJobId: string) {
     //     try {
     //         const command = new GetIngestionJobCommand({
-    //             knowledgeBaseId: this.settings.knowledgeBaseId,
+    //             knowledgeBaseId: this.configuration.knowledgeBaseId,
     //             ingestionJobId: ingestionJobId,
     //             dataSourceId: 'id',
     //         });
@@ -197,7 +262,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     // // async listIngestionJobs() {
     // //     try {
     // //         const command = new ListIngestionJobsCommand({
-    // //             knowledgeBaseId: this.settings.knowledgeBaseId,
+    // //             knowledgeBaseId: this.configuration.knowledgeBaseId,
     // //         });
     // //
     // //         return await this.bedrockClient.send(command);
@@ -213,7 +278,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     //     numberOfResults = 5
     // ): Promise<any[]> {
     //     const retrieveCommand = new RetrieveCommand({
-    //         knowledgeBaseId: this.settings.knowledgeBaseId,
+    //         knowledgeBaseId: this.configuration.knowledgeBaseId,
     //         retrievalQuery: {
     //             text: queryText,
     //         },

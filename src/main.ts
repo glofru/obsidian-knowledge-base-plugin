@@ -1,6 +1,7 @@
 import { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
+import { KnowledgeBase, knowledgeBaseFactory } from './knowledge-bases';
 
 export interface SyncProps {
     allVault?: boolean; // Default: false
@@ -9,16 +10,18 @@ export interface SyncProps {
 export default class KnowledgeBasePlugin extends Plugin {
     settings: KBPluginSettings;
     fileChangesTracker: FileChangesTracker;
+    knowledgeBase: KnowledgeBase;
 
     async onload() {
         await this.loadSettings();
+        this.createKnowledgeBase();
         this.fileChangesTracker = new FileChangesTracker(this.app.vault);
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new KBSettingTab(this.app, this));
 
         // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-        this.registerInterval(window.setInterval(() => this.sync(), 2 * 1000));
+        // this.registerInterval(window.setInterval(() => this.sync(), 2 * 1000));
 
         // // This creates an icon in the left ribbon.
         // const ribbonIconEl = this.addRibbonIcon(
@@ -84,9 +87,17 @@ export default class KnowledgeBasePlugin extends Plugin {
 
     onunload() {}
 
-    async sync(props?: SyncProps) {}
+    async sync(props?: SyncProps) {
+        console.log('Syncing Knowledge Base');
+        const { syncId } = await this.knowledgeBase.startSync({
+            changedFiles: this.fileChangesTracker.getChangedFiles(),
+            deletedFiles: this.fileChangesTracker.getDeletePaths(),
+        });
+        this.fileChangesTracker.reset();
+        console.log(`Start syncing Knowledge Base: ${syncId}`);
+    }
 
-    async loadSettings() {
+    private async loadSettings() {
         this.settings = Object.assign(
             {},
             DEFAULT_SETTINGS,
@@ -96,5 +107,9 @@ export default class KnowledgeBasePlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+    }
+
+    private createKnowledgeBase() {
+        this.knowledgeBase = knowledgeBaseFactory(this.settings);
     }
 }

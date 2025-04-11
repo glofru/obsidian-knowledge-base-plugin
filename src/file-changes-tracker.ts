@@ -1,4 +1,4 @@
-import { Vault, TFile } from 'obsidian';
+import { Vault, TFile, TAbstractFile } from 'obsidian';
 
 export class FileChangesTracker {
     private changedFiles: Set<TFile> = new Set();
@@ -9,20 +9,32 @@ export class FileChangesTracker {
     }
 
     private registerEventListeners() {
-        this.vault.on('create', (file: TFile) => {
+        this.vault.on('create', (file: TAbstractFile) => {
             // console.log('create', file);
 
+            if (!(file instanceof TFile)) {
+                return;
+            }
+
             this.changedFiles.add(file);
         });
 
-        this.vault.on('modify', (file: TFile) => {
+        this.vault.on('modify', (file: TAbstractFile) => {
             // console.log('modify', file);
 
+            if (!(file instanceof TFile)) {
+                return;
+            }
+
             this.changedFiles.add(file);
         });
 
-        this.vault.on('rename', (file: TFile, oldPath: string) => {
+        this.vault.on('rename', (file: TAbstractFile, oldPath: string) => {
             // console.log('rename', file, oldPath);
+
+            if (!(file instanceof TFile)) {
+                return;
+            }
 
             this.changedFiles.add(file);
 
@@ -35,8 +47,12 @@ export class FileChangesTracker {
             this.deletePaths.add(oldPath);
         });
 
-        this.vault.on('delete', (file: TFile) => {
+        this.vault.on('delete', (file: TAbstractFile) => {
             // console.log('delete', file);
+
+            if (!(file instanceof TFile)) {
+                return;
+            }
 
             this.deletePaths.add(file.path);
         });
@@ -50,7 +66,8 @@ export class FileChangesTracker {
         return Array.from(this.deletePaths);
     }
 
-    resetChangedNotes() {
+    reset() {
         this.changedFiles.clear();
+        this.deletePaths.clear();
     }
 }
