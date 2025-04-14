@@ -28,10 +28,11 @@ import {
 export interface AWSBedrockKnowledgeBaseConfiguration {
     region: string;
     knowledgeBaseId: string;
+    modelArn: string;
 }
 
 export class AWSBedrockKnowledgeBase extends KnowledgeBase {
-    private bedrockClient: BedrockAgentClient;
+    private bedrockAgentClient: BedrockAgentClient;
     private bedrockRuntimeClient: BedrockAgentRuntimeClient;
     private kendraClient: KendraClient;
     private s3Client: S3Client;
@@ -53,7 +54,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     }: StartSyncResponse): Promise<SyncStatusResponse> {
         const statuses = await getDataSourcesStatus(
             {
-                bedrockClient: this.bedrockClient,
+                bedrockAgentClient: this.bedrockAgentClient,
                 kendraClient: this.kendraClient,
                 knowledgeBaseId: this.configuration.knowledgeBaseId,
             },
@@ -146,7 +147,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         const { knowledgeBaseId } = this.configuration;
 
         const s3BucketName = await getKnowledgeBaseS3BucketName({
-            bedrockClient: this.bedrockClient,
+            bedrockAgentClient: this.bedrockAgentClient,
             kendraClient: this.kendraClient,
             knowledgeBaseId,
         });
@@ -159,7 +160,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
 
         const syncId = await syncKnowledgeBase({
             knowledgeBaseId,
-            bedrockClient: this.bedrockClient,
+            bedrockAgentClient: this.bedrockAgentClient,
             kendraClient: this.kendraClient,
         });
 
@@ -177,7 +178,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     //             dataSourceId: 'id',
     //         });
     //
-    //         const response = await this.bedrockClient.send(command);
+    //         const response = await this.bedrockAgentClient.send(command);
     //
     //         const ingestionJobId = response.ingestionJob?.ingestionJobId;
     //         if (!ingestionJobId) {
@@ -200,7 +201,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     //             dataSourceId: 'id',
     //         });
     //
-    //         return await this.bedrockClient.send(command);
+    //         return await this.bedrockAgentClient.send(command);
     //     } catch (error) {
     //         console.error('Error getting ingestion job status:', error);
     //         throw error;
@@ -213,7 +214,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     // //             knowledgeBaseId: this.configuration.knowledgeBaseId,
     // //         });
     // //
-    // //         return await this.bedrockClient.send(command);
+    // //         return await this.bedrockAgentClient.send(command);
     // //     } catch (error) {
     // //         console.error('Error listing ingestion jobs:', error);
     // //         throw error;
@@ -244,7 +245,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     // // async listKnowledgeBases() {
     // //     try {
     // //         const command = new ListKnowledgeBasesCommand({});
-    // //         return await this.bedrockClient.send(command);
+    // //         return await this.bedrockAgentClient.send(command);
     // //     } catch (error) {
     // //         console.error('Error listing Knowledge Bases:', error);
     // //         throw error;
@@ -257,7 +258,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     //         const command = new DeleteKnowledgeBaseCommand({
     //             knowledgeBaseId: knowledgeBaseId,
     //         });
-    //         return await this.bedrockClient.send(command);
+    //         return await this.bedrockAgentClient.send(command);
     //     } catch (error) {
     //         console.error('Error deleting Knowledge Base:', error);
     //         throw error;

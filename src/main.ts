@@ -60,7 +60,7 @@ export default class KnowledgeBasePlugin extends Plugin {
         this.syncInterval = {
             statusRefreshId: 0,
             intervalRefreshId: this.setIntervalRefresh(),
-            value: this.data.settings.syncConfiguration.syncFrequency,
+            value: this.data.settings.syncConfiguration.syncFrequencyMinutes,
         };
         await this.updateSyncInformation(this.data.sync);
 
@@ -122,7 +122,6 @@ export default class KnowledgeBasePlugin extends Plugin {
         }
 
         // TODO: implement props allVault
-        console.log('Syncing Knowledge Base');
         const { syncId } = await this.knowledgeBase.startSync({
             changedFiles: this.fileChangesTracker
                 .getChangedFiles()
@@ -212,7 +211,9 @@ export default class KnowledgeBasePlugin extends Plugin {
         return this.registerInterval(
             window.setInterval(
                 () => this.startSyncing(),
-                this.data.settings.syncConfiguration.syncFrequency * 60 * 1000
+                this.data.settings.syncConfiguration.syncFrequencyMinutes *
+                    60 *
+                    1000
             )
         );
     }
@@ -220,12 +221,12 @@ export default class KnowledgeBasePlugin extends Plugin {
     async savePluginData() {
         // Register a new interval if the sync frequency changes
         if (
-            this.data.settings.syncConfiguration.syncFrequency !=
+            this.data.settings.syncConfiguration.syncFrequencyMinutes !=
             this.syncInterval.value
         ) {
             window.clearInterval(this.syncInterval.intervalRefreshId);
             this.syncInterval.value =
-                this.data.settings.syncConfiguration.syncFrequency;
+                this.data.settings.syncConfiguration.syncFrequencyMinutes;
             this.syncInterval.intervalRefreshId = this.setIntervalRefresh();
         }
 

@@ -4,13 +4,13 @@ import {
     KnowledgeBaseConfigurations,
     KnowledgeBaseProvider,
 } from './knowledge-bases';
-import { awsBedrockSettings } from './knowledge-bases/aws-bedrock';
+import { AWSBedrockSetting } from './knowledge-bases/aws-bedrock';
 
 export interface KBPluginSettings {
     provider: KnowledgeBaseProvider;
     providerConfiguration: KnowledgeBaseConfigurations;
     syncConfiguration: {
-        syncFrequency: number; // in minutes
+        syncFrequencyMinutes: number;
         excludedFolders: string[];
         excludedFileExtensions: string[];
     };
@@ -24,9 +24,10 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
     providerConfiguration: {
         region: 'us-west-2',
         knowledgeBaseId: '',
+        modelArn: '',
     },
     syncConfiguration: {
-        syncFrequency: 60,
+        syncFrequencyMinutes: 60,
         excludedFolders: [],
         excludedFileExtensions: [],
     },
@@ -45,11 +46,11 @@ export class KBSettingTab extends PluginSettingTab {
 
     private generateSyncConfiguration(containerEl: HTMLElement): void {
         new Setting(this.containerEl)
-            .setName('Sync Configuration')
+            .setName('Sync configuration')
             .setHeading();
 
         new Setting(containerEl)
-            .setName('Refresh Frequency')
+            .setName('Refresh frequency')
             .setDesc(
                 'The frequency at which to sync with the knowledge base (minutes)'
             )
@@ -57,17 +58,17 @@ export class KBSettingTab extends PluginSettingTab {
                 text
                     .setPlaceholder('60')
                     .setValue(
-                        this.plugin.data.settings.syncConfiguration.syncFrequency.toString()
+                        this.plugin.data.settings.syncConfiguration.syncFrequencyMinutes.toString()
                     )
                     .onChange(async (value) => {
-                        this.plugin.data.settings.syncConfiguration.syncFrequency =
+                        this.plugin.data.settings.syncConfiguration.syncFrequencyMinutes =
                             parseInt(value);
                         await this.plugin.savePluginData();
                     })
             );
 
         new Setting(containerEl)
-            .setName('Excluded Folders')
+            .setName('Excluded folders')
             .setDesc('Folders to exclude from syncing (separated by comma)')
             .addText((text) =>
                 text
@@ -85,7 +86,7 @@ export class KBSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName('Excluded File Extensions')
+            .setName('Excluded file extensions')
             .setDesc(
                 'File extensions to exclude from syncing (separated by comma)'
             )
@@ -105,7 +106,7 @@ export class KBSettingTab extends PluginSettingTab {
             );
 
         new Setting(containerEl)
-            .setName('Sync Now')
+            .setName('Sync now')
             .setDesc('Manually trigger a sync with the knowledge base')
             .addButton((button) =>
                 button
@@ -122,12 +123,14 @@ export class KBSettingTab extends PluginSettingTab {
 
     private generateBehaviourConfiguration = (containerEl: HTMLElement) => {
         new Setting(this.containerEl)
-            .setName('Behaviour Configuration')
+            .setName('Behaviour configuration')
             .setHeading();
 
         new Setting(containerEl)
-            .setName('Create New Chat on Icon Click')
-            .setDesc('Create a new chat when clicking on the ribbon icon')
+            .setName('Create new chat when opening a chat')
+            .setDesc(
+                'Create always a new chat when chat when given the command of opening a chat'
+            )
             .addToggle((toggle) =>
                 toggle
                     .setValue(
@@ -148,7 +151,7 @@ export class KBSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('Knowledge Base Provider')
+            .setName('Knowledge Base provider')
             .setDesc('The Knowledge Base service to sync with Obsidian')
             .addDropdown((dropdown) => {
                 dropdown
@@ -173,7 +176,9 @@ export class KBSettingTab extends PluginSettingTab {
             this.plugin.data.settings.provider ===
             KnowledgeBaseProvider.AWS_BEDROCK
         ) {
-            awsBedrockSettings(containerEl, this.plugin);
+            new AWSBedrockSetting(
+                this.plugin.data.settings.providerConfiguration
+            ).render(containerEl, this.plugin);
         }
 
         this.generateSyncConfiguration(containerEl);

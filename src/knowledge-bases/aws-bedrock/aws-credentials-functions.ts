@@ -6,6 +6,7 @@ import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
 import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
 import { KendraClient } from '@aws-sdk/client-kendra';
 import { S3Client } from '@aws-sdk/client-s3';
+import { BedrockClient } from '@aws-sdk/client-bedrock';
 
 /**
  * Decorator factory that refreshes AWS credentials before method execution
@@ -23,7 +24,13 @@ export function refreshAwsCredentials(profile: string) {
             const credentials = refreshCredentials(profile);
 
             // Refresh Bedrock client
-            this.bedrockClient = new BedrockAgentClient({
+            this.bedrockClient = new BedrockClient({
+                region: this.configuration.region,
+                credentials: credentials,
+            });
+
+            // Refresh Bedrock Agent client
+            this.bedrockAgentClient = new BedrockAgentClient({
                 region: this.configuration.region,
                 credentials: credentials,
             });

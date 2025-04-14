@@ -18,14 +18,14 @@ import cacheManager from '@type-cacheable/core';
 const SYNC_ID_SEPARATOR = '|';
 
 export interface KnowledgeBaseRequestProps {
-    bedrockClient: BedrockAgentClient;
+    bedrockAgentClient: BedrockAgentClient;
     kendraClient: KendraClient;
     knowledgeBaseId: string;
 }
 
 const getKnowledgeBase = async ({
     knowledgeBaseId,
-    bedrockClient,
+    bedrockAgentClient,
 }: KnowledgeBaseRequestProps): Promise<any> => {
     const cachedKB = await cacheManager.client?.get(`kb-${knowledgeBaseId}`);
     if (cachedKB) {
@@ -36,7 +36,7 @@ const getKnowledgeBase = async ({
     const command = new GetKnowledgeBaseCommand({
         knowledgeBaseId,
     });
-    const response = await bedrockClient.send(command);
+    const response = await bedrockAgentClient.send(command);
 
     await cacheManager.client?.set(
         `kb-${knowledgeBaseId}`,
