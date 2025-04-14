@@ -126,8 +126,8 @@ export class KBSettingTab extends PluginSettingTab {
             .setHeading();
 
         new Setting(containerEl)
-            .setName('Create New Chat on Ribbon Click')
-            .setDesc('Create a new chat when clicking on the ribbon')
+            .setName('Create New Chat on Icon Click')
+            .setDesc('Create a new chat when clicking on the ribbon icon')
             .addToggle((toggle) =>
                 toggle
                     .setValue(

@@ -34,6 +34,10 @@
 	user-select: text;
 }
 
+::selection {
+	background: var(--text-highlight-bg);
+}
+
 .chat-actions {
 	display: flex;
 	justify-content: flex-end;
