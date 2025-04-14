@@ -10,6 +10,6 @@ export const knowledgeBaseFactory = ({
         case KnowledgeBaseProvider.AWS_BEDROCK:
             return new AWSBedrockKnowledgeBase(providerConfiguration);
         default:
-            throw new Error(`Unknown provider: ${provider}`);
+            throw `Unknown provider: ${provider}`;
     }
 };

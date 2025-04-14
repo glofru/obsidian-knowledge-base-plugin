@@ -4,12 +4,13 @@ import {
     KnowledgeBaseConfigurations,
     KnowledgeBaseProvider,
 } from './knowledge-bases';
+import { awsBedrockSettings } from './knowledge-bases/aws-bedrock';
 
 export interface KBPluginSettings {
     provider: KnowledgeBaseProvider;
     providerConfiguration: KnowledgeBaseConfigurations;
     syncConfiguration: {
-        refreshFrequency: number; // in minutes
+        syncFrequency: number; // in minutes
         excludedFolders: string[];
         excludedFileExtensions: string[];
     };
@@ -23,10 +24,9 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
     providerConfiguration: {
         region: 'us-west-2',
         knowledgeBaseId: '',
-        s3BucketName: '',
     },
     syncConfiguration: {
-        refreshFrequency: 60,
+        syncFrequency: 60,
         excludedFolders: [],
         excludedFileExtensions: [],
     },
@@ -43,61 +43,6 @@ export class KBSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    private generateAWSBedrockConfiguration(containerEl: HTMLElement): void {
-        new Setting(this.containerEl).setName('AWS Bedrock').setHeading();
-
-        new Setting(containerEl)
-            .setName('Region')
-            .setDesc(
-                'The region of the AWS Account containing the knowledge base'
-            )
-            .addText((text) =>
-                text
-                    .setPlaceholder('us-west-2')
-                    .setValue(this.plugin.settings.providerConfiguration.region)
-                    .onChange(async (value) => {
-                        this.plugin.settings.providerConfiguration.region =
-                            value;
-                        await this.plugin.saveSettings();
-                    })
-            );
-
-        new Setting(containerEl)
-            .setName('Knowledge Base ID')
-            .setDesc('The ID of the knowledge base')
-            .addText((text) =>
-                text
-                    .setPlaceholder('0123456789')
-                    .setValue(
-                        this.plugin.settings.providerConfiguration
-                            .knowledgeBaseId
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.providerConfiguration.knowledgeBaseId =
-                            value;
-                        await this.plugin.saveSettings();
-                    })
-            );
-
-        new Setting(containerEl)
-            .setName('S3 Bucket Name')
-            .setDesc(
-                'The name of the S3 bucket where to store the data for the knowledge base'
-            )
-            .addText((text) =>
-                text
-                    .setPlaceholder('my-knowledge-base-data')
-                    .setValue(
-                        this.plugin.settings.providerConfiguration.s3BucketName
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.providerConfiguration.s3BucketName =
-                            value;
-                        await this.plugin.saveSettings();
-                    })
-            );
-    }
-
     private generateSyncConfiguration(containerEl: HTMLElement): void {
         new Setting(this.containerEl)
             .setName('Sync Configuration')
@@ -112,12 +57,12 @@ export class KBSettingTab extends PluginSettingTab {
                 text
                     .setPlaceholder('60')
                     .setValue(
-                        this.plugin.settings.syncConfiguration.refreshFrequency.toString()
+                        this.plugin.data.settings.syncConfiguration.syncFrequency.toString()
                     )
                     .onChange(async (value) => {
-                        this.plugin.settings.syncConfiguration.refreshFrequency =
+                        this.plugin.data.settings.syncConfiguration.syncFrequency =
                             parseInt(value);
-                        await this.plugin.saveSettings();
+                        await this.plugin.savePluginData();
                     })
             );
 
@@ -128,14 +73,14 @@ export class KBSettingTab extends PluginSettingTab {
                 text
                     .setPlaceholder('secret_folder, keys, ...')
                     .setValue(
-                        this.plugin.settings.syncConfiguration.excludedFolders.join(
+                        this.plugin.data.settings.syncConfiguration.excludedFolders.join(
                             ', '
                         )
                     )
                     .onChange(async (value) => {
-                        this.plugin.settings.syncConfiguration.excludedFolders =
+                        this.plugin.data.settings.syncConfiguration.excludedFolders =
                             value.split(', ');
-                        await this.plugin.saveSettings();
+                        await this.plugin.savePluginData();
                     })
             );
 
@@ -148,14 +93,14 @@ export class KBSettingTab extends PluginSettingTab {
                 text
                     .setPlaceholder('csv, txt, ...')
                     .setValue(
-                        this.plugin.settings.syncConfiguration.excludedFileExtensions.join(
+                        this.plugin.data.settings.syncConfiguration.excludedFileExtensions.join(
                             ', '
                         )
                     )
                     .onChange(async (value) => {
-                        this.plugin.settings.syncConfiguration.excludedFileExtensions =
+                        this.plugin.data.settings.syncConfiguration.excludedFileExtensions =
                             value.split(', ');
-                        await this.plugin.saveSettings();
+                        await this.plugin.savePluginData();
                     })
             );
 
@@ -163,9 +108,15 @@ export class KBSettingTab extends PluginSettingTab {
             .setName('Sync Now')
             .setDesc('Manually trigger a sync with the knowledge base')
             .addButton((button) =>
-                button.setButtonText('Sync').onClick(async () => {
-                    await this.plugin.sync({ allVault: true });
-                })
+                button
+                    .setButtonText('Sync')
+                    .onClick(async () => {
+                        button.setDisabled(true);
+                        await this.plugin.startSyncing({ allVault: true });
+                        button.setDisabled(this.plugin.data.sync.isSyncing);
+                    })
+                    .setClass('mod-cta')
+                    .setDisabled(this.plugin.data.sync.isSyncing)
             );
     }
 
@@ -180,13 +131,13 @@ export class KBSettingTab extends PluginSettingTab {
             .addToggle((toggle) =>
                 toggle
                     .setValue(
-                        this.plugin.settings.behaviourConfiguration
+                        this.plugin.data.settings.behaviourConfiguration
                             .createNewChatOnRibbonClick
                     )
                     .onChange(async (value) => {
-                        this.plugin.settings.behaviourConfiguration.createNewChatOnRibbonClick =
+                        this.plugin.data.settings.behaviourConfiguration.createNewChatOnRibbonClick =
                             value;
-                        await this.plugin.saveSettings();
+                        await this.plugin.savePluginData();
                     })
             );
     };
@@ -210,18 +161,19 @@ export class KBSettingTab extends PluginSettingTab {
                             {}
                         )
                     )
-                    .setValue(this.plugin.settings.provider)
+                    .setValue(this.plugin.data.settings.provider)
                     .onChange(async (value: KnowledgeBaseProvider) => {
-                        this.plugin.settings.provider = value;
-                        await this.plugin.saveSettings();
+                        this.plugin.data.settings.provider = value;
+                        await this.plugin.savePluginData();
                         this.display();
                     });
             });
 
         if (
-            this.plugin.settings.provider === KnowledgeBaseProvider.AWS_BEDROCK
+            this.plugin.data.settings.provider ===
+            KnowledgeBaseProvider.AWS_BEDROCK
         ) {
-            this.generateAWSBedrockConfiguration(containerEl);
+            awsBedrockSettings(containerEl, this.plugin);
         }
 
         this.generateSyncConfiguration(containerEl);

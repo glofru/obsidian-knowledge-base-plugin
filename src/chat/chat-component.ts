@@ -1,5 +1,6 @@
-import { setIcon } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 import { QueryCitation, QueryCitationReference } from '../knowledge-bases';
+import { format } from 'date-fns';
 
 type SendCallback = (message: string) => Promise<void>;
 type CitationReferenceCallback = (reference: QueryCitationReference) => void;
@@ -57,13 +58,20 @@ export interface ChatMessage {
     role: 'user' | 'assistant';
 }
 
+export interface ChatSyncInformation {
+    lastSync?: string;
+    isSyncing: boolean;
+}
+
 export interface ChatComponentProps {
     messages: ChatMessage[];
     onSendMessage: SendCallback;
     onClickReference: CitationReferenceCallback;
+    syncInformation: ChatSyncInformation;
 }
 
 export class ChatComponent {
+    private syncInformation: HTMLElement;
     private chatLog: HTMLElement;
     private inputEl: HTMLInputElement;
 
@@ -71,6 +79,9 @@ export class ChatComponent {
         container: HTMLElement,
         private props: ChatComponentProps
     ) {
+        this.syncInformation = container.createDiv('sync-information');
+        this.syncInformation.setText('Last sync: ...');
+
         this.chatLog = container.createDiv('chat-log');
         const inputWrapper = container.createDiv('chat-input-wrapper');
 
@@ -97,6 +108,10 @@ export class ChatComponent {
             props.messages.forEach((message) => {
                 this.appendMessage(message);
             });
+        }
+
+        if (props.syncInformation) {
+            this.setSyncInformation(props.syncInformation);
         }
     }
 
@@ -128,6 +143,7 @@ export class ChatComponent {
                 return;
             }
             navigator.clipboard.writeText(textToCopy);
+            new Notice('Message copied to clipboard');
         };
 
         this.chatLog.scrollTop = this.chatLog.scrollHeight;
@@ -151,6 +167,14 @@ export class ChatComponent {
                 this.props.onClickReference
             )
         );
+    }
+
+    setSyncInformation({ lastSync, isSyncing }: ChatSyncInformation) {
+        const syncFormatted = lastSync
+            ? format(new Date(lastSync), 'EEEE, MMMM do, h:mma')
+            : 'never';
+        const syncing = isSyncing ? ' (syncing now)' : '';
+        this.syncInformation.setText(`Last sync: ${syncFormatted}${syncing}`);
     }
 
     private findBubble(messageId: string): HTMLElement | null {

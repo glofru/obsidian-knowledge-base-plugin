@@ -11,8 +11,12 @@ import {
 } from '../knowledge-base';
 
 import { uploadChangesToS3 } from './aws-s3-functions';
-import { KendraClient } from '@aws-sdk/client-kendra';
-import { syncKnowledgeBase } from './aws-knowledge-base-functions';
+import { KendraClient, DataSourceSyncJobStatus } from '@aws-sdk/client-kendra';
+import {
+    getDataSourcesStatus,
+    getKnowledgeBaseS3BucketName,
+    syncKnowledgeBase,
+} from './aws-knowledge-base-functions';
 import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
 import { refreshAwsCredentials } from './aws-credentials-functions';
 import {
@@ -24,7 +28,6 @@ import {
 export interface AWSBedrockKnowledgeBaseConfiguration {
     region: string;
     knowledgeBaseId: string;
-    s3BucketName: string;
 }
 
 export class AWSBedrockKnowledgeBase extends KnowledgeBase {
@@ -45,11 +48,33 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     }
 
     @refreshAwsCredentials('default')
-    getSyncStatus({ syncId }: StartSyncResponse): Promise<SyncStatusResponse> {
-        return Promise.resolve({
-            syncId,
-            status: SyncStatus.SUCCEED,
-        });
+    async getSyncStatus({
+        syncId,
+    }: StartSyncResponse): Promise<SyncStatusResponse> {
+        const statuses = await getDataSourcesStatus(
+            {
+                bedrockClient: this.bedrockClient,
+                kendraClient: this.kendraClient,
+                knowledgeBaseId: this.configuration.knowledgeBaseId,
+            },
+            syncId
+        );
+
+        if (
+            statuses.includes(DataSourceSyncJobStatus.SYNCING) ||
+            statuses.includes(DataSourceSyncJobStatus.SYNCING_INDEXING)
+        ) {
+            return { syncId, status: SyncStatus.IN_PROGRESS };
+        }
+
+        if (
+            statuses.includes(DataSourceSyncJobStatus.FAILED) ||
+            statuses.includes(DataSourceSyncJobStatus.ABORTED)
+        ) {
+            return { syncId, status: SyncStatus.FAILED };
+        }
+
+        return { syncId, status: SyncStatus.SUCCEED };
     }
 
     @refreshAwsCredentials('default')
@@ -70,7 +95,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
 
         if (!output || !output.text) {
             console.error('No response output received from Bedrock Runtime');
-            throw new Error('No response output from Bedrock Runtime');
+            throw 'No response output from Bedrock Runtime';
         }
 
         this.chatToSessionId.set(chatId, newSessionId ?? sessionId ?? '');
@@ -101,7 +126,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
 
         if (!stream) {
             console.error('No response stream received from Bedrock Runtime');
-            throw new Error('No response stream from Bedrock Runtime');
+            throw 'No response stream from Bedrock Runtime';
         }
 
         this.chatToSessionId.set(chatId, newSessionId ?? sessionId ?? '');
@@ -118,7 +143,13 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
 
     @refreshAwsCredentials('default')
     async startSync(props: StartSyncProps): Promise<StartSyncResponse> {
-        const { knowledgeBaseId, s3BucketName } = this.configuration;
+        const { knowledgeBaseId } = this.configuration;
+
+        const s3BucketName = await getKnowledgeBaseS3BucketName({
+            bedrockClient: this.bedrockClient,
+            kendraClient: this.kendraClient,
+            knowledgeBaseId,
+        });
 
         await uploadChangesToS3({
             ...props,

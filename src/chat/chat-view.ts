@@ -1,13 +1,18 @@
 import { ItemView, ViewStateResult, WorkspaceLeaf } from 'obsidian';
-import { ChatComponent, ChatMessage } from './chat-component';
+import {
+    ChatComponent,
+    ChatMessage,
+    ChatSyncInformation,
+} from './chat-component';
 import { KnowledgeBase, QueryCitationReference } from '../knowledge-bases';
-import { generateUUID } from '../obsidian-functions';
+import { generateUUID, tryCatchInNotice } from '../obsidian-functions';
 import { QueryCitation } from '../knowledge-bases';
 
 export const VIEW_TYPE_CHAT = 'kb-chat-view';
 
 interface ChatViewProps {
     knowledgeBase: KnowledgeBase;
+    syncInformation: ChatSyncInformation;
 }
 
 interface ChatViewState {
@@ -20,14 +25,14 @@ const DEFAULT_STATE: ChatViewState = {
 };
 
 export class ChatView extends ItemView {
-    constructor(leaf: WorkspaceLeaf, { knowledgeBase }: ChatViewProps) {
+    constructor(
+        leaf: WorkspaceLeaf,
+        private props: ChatViewProps
+    ) {
         super(leaf);
-
-        this.knowledgeBase = knowledgeBase;
     }
 
     private chatComponent: ChatComponent;
-    private knowledgeBase: KnowledgeBase;
     private state?: ChatViewState;
 
     static TITLE = 'Knowledge Base Chat';
@@ -72,6 +77,7 @@ export class ChatView extends ItemView {
         }
     };
 
+    @tryCatchInNotice('Error querying Knowledge Base')
     private async onSendMessage(message: string) {
         if (!this.state) {
             return;
@@ -84,7 +90,7 @@ export class ChatView extends ItemView {
         };
         await this.appendMessage(userMessage, { onChat: true, onState: true });
 
-        const stream = this.knowledgeBase.queryStream({
+        const stream = this.props.knowledgeBase.queryStream({
             text: message,
             chatId: this.state.chatId,
         });
@@ -120,8 +126,12 @@ export class ChatView extends ItemView {
         );
     }
 
+    updateSyncInformation(syncInformation: ChatSyncInformation) {
+        this.props.syncInformation = syncInformation;
+        this.chatComponent.setSyncInformation(syncInformation);
+    }
+
     async onOpen() {
-        console.log('On open');
         const container = this.containerEl;
         container.empty();
 
@@ -129,6 +139,7 @@ export class ChatView extends ItemView {
 
         this.chatComponent = new ChatComponent(container, {
             messages,
+            syncInformation: this.props.syncInformation,
             onSendMessage: (message: string) => this.onSendMessage(message),
             onClickReference: ({ fileName }: QueryCitationReference) => {
                 this.app.workspace.openLinkText(fileName, '', true);

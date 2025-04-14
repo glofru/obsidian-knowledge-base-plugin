@@ -64,7 +64,7 @@ export const uploadChangesToS3 = async ({
         console.log(`Successfully deleted ${deletions.length} files from S3`);
     } catch (error) {
         console.error(`Error deleting files from S3:`, error);
-        throw new Error(`Error deleting files from S3: ${error.message}`);
+        throw `Error deleting files from S3: ${error.message}`;
     }
 
     const uploads = await prepareS3Changes(changedFiles, bucketName);
@@ -78,6 +78,6 @@ export const uploadChangesToS3 = async ({
         console.log(`Successfully uploaded ${uploads.length} files to S3`);
     } catch (error) {
         console.error(`Error uploading files to S3:`, error);
-        throw new Error(`Error uploading files to S3: ${error.message}`);
+        throw `Error uploading files to S3: ${error.message}`;
     }
 };

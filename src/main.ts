@@ -1,21 +1,43 @@
 import { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
-import { KnowledgeBase, knowledgeBaseFactory } from './knowledge-bases';
+import {
+    KnowledgeBase,
+    knowledgeBaseFactory,
+    StartSyncResponse,
+    SyncStatus,
+} from './knowledge-bases';
 import { generateUUID, tryCatchInNotice } from './obsidian-functions';
-import { ChatView, VIEW_TYPE_CHAT } from './chat';
+import { ChatView, ChatSyncInformation, VIEW_TYPE_CHAT } from './chat';
+import cacheManager from '@type-cacheable/core';
 
 export interface SyncProps {
     allVault?: boolean; // Default: false
 }
 
-export default class KnowledgeBasePlugin extends Plugin {
+type SyncInformation = ChatSyncInformation & StartSyncResponse;
+
+export interface KBPluginData {
+    sync: SyncInformation;
     settings: KBPluginSettings;
+}
+
+export default class KnowledgeBasePlugin extends Plugin {
+    data: KBPluginData;
     fileChangesTracker: FileChangesTracker;
     knowledgeBase: KnowledgeBase;
 
+    private syncInterval = {
+        intervalRefreshId: 0,
+        statusRefreshId: 0,
+        value: 0,
+    };
+
     async onload() {
-        await this.loadSettings();
+        cacheManager.setOptions({
+            ttlSeconds: 30,
+        });
+        await this.loadPluginData();
         this.createKnowledgeBase();
         this.fileChangesTracker = new FileChangesTracker(this.app.vault);
 
@@ -24,15 +46,23 @@ export default class KnowledgeBasePlugin extends Plugin {
 
         this.registerView(
             VIEW_TYPE_CHAT,
-            (leaf) => new ChatView(leaf, { knowledgeBase: this.knowledgeBase })
+            (leaf) =>
+                new ChatView(leaf, {
+                    knowledgeBase: this.knowledgeBase,
+                    syncInformation: this.data.sync,
+                })
         );
 
         this.addRibbonIcon('brain', `Open ${ChatView.TITLE}`, () => {
             this.activateChatView();
         });
 
-        // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-        // this.registerInterval(window.setInterval(() => this.sync(), 2 * 1000));
+        this.syncInterval = {
+            statusRefreshId: 0,
+            intervalRefreshId: this.setIntervalRefresh(),
+            value: this.data.settings.syncConfiguration.syncFrequency,
+        };
+        await this.updateSyncInformation(this.data.sync);
 
         // // This creates an icon in the left ribbon.
         // const ribbonIconEl = this.addRibbonIcon(
@@ -96,11 +126,12 @@ export default class KnowledgeBasePlugin extends Plugin {
         //
     }
 
-    onunload() {}
-
     private async activateChatView() {
         // Don't create a new chat if enabled in settings and chat available
-        if (!this.settings.behaviourConfiguration.createNewChatOnRibbonClick) {
+        if (
+            !this.data.settings.behaviourConfiguration
+                .createNewChatOnRibbonClick
+        ) {
             const existingLeaf =
                 this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
 
@@ -129,23 +160,84 @@ export default class KnowledgeBasePlugin extends Plugin {
         await this.app.workspace.revealLeaf(leaf);
     }
 
-    @tryCatchInNotice('Error querying Knowledge Base')
-    async query(props: { text: string; chatId: string }) {
-        const { text, chatId } = props;
-        const response = await this.knowledgeBase.query({ text, chatId });
-        return response.text;
-    }
-
     @tryCatchInNotice('Error syncing Knowledge Base')
-    async sync(props?: SyncProps) {
+    async startSyncing(props?: SyncProps) {
+        if (this.data.sync.isSyncing) {
+            throw 'Knowledge Base already syncing';
+        }
+
         // TODO: implement props allVault
         console.log('Syncing Knowledge Base');
         const { syncId } = await this.knowledgeBase.startSync({
-            changedFiles: this.fileChangesTracker.getChangedFiles(),
-            deletedFiles: this.fileChangesTracker.getDeletePaths(),
+            changedFiles: this.fileChangesTracker
+                .getChangedFiles()
+                .filter(
+                    ({ extension, path }) =>
+                        !this.data.settings.syncConfiguration.excludedFileExtensions.contains(
+                            extension
+                        ) &&
+                        !this.data.settings.syncConfiguration.excludedFolders.contains(
+                            path
+                        )
+                ),
+            deletedFiles: this.fileChangesTracker
+                .getDeletePaths()
+                .filter(
+                    (path) =>
+                        !this.data.settings.syncConfiguration.excludedFolders.contains(
+                            path
+                        )
+                ),
         });
         this.fileChangesTracker.reset();
+
         console.log(`Start syncing Knowledge Base: ${syncId}`);
+
+        await this.updateSyncInformation({
+            lastSync: new Date().toISOString(),
+            isSyncing: true,
+            syncId,
+        });
+    }
+
+    private async updateSyncInformation(
+        syncInformation: Partial<SyncInformation>
+    ) {
+        const { isSyncing, syncId } = syncInformation;
+        if (isSyncing && syncId) {
+            this.syncInterval.statusRefreshId = this.registerInterval(
+                window.setInterval(async () => {
+                    const { status } = await this.knowledgeBase.getSyncStatus({
+                        syncId,
+                    });
+                    console.log('Sync status', status);
+                    if (status === SyncStatus.SUCCEED) {
+                        await this.updateSyncInformation({
+                            isSyncing: false,
+                        });
+                        window.clearInterval(this.syncInterval.statusRefreshId);
+                    }
+                }, 2 * 1000)
+            );
+        }
+
+        this.data.sync = {
+            ...this.data.sync,
+            ...syncInformation,
+        };
+
+        await this.savePluginData();
+        for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)) {
+            if (!leaf.view) {
+                continue;
+            }
+
+            if (!(leaf.view instanceof ChatView)) {
+                continue;
+            }
+
+            (leaf.view as ChatView).updateSyncInformation(this.data.sync);
+        }
     }
 
     @tryCatchInNotice('Error deleting Knowledge Base')
@@ -153,19 +245,39 @@ export default class KnowledgeBasePlugin extends Plugin {
         // TODO
     }
 
-    private async loadSettings() {
-        this.settings = Object.assign(
+    private async loadPluginData() {
+        this.data = Object.assign(
             {},
-            DEFAULT_SETTINGS,
+            { settings: DEFAULT_SETTINGS, sync: { isSyncing: false } },
             await this.loadData()
         );
     }
 
-    async saveSettings() {
-        await this.saveData(this.settings);
+    private setIntervalRefresh(): number {
+        return this.registerInterval(
+            window.setInterval(
+                () => this.startSyncing(),
+                this.data.settings.syncConfiguration.syncFrequency * 60 * 1000
+            )
+        );
+    }
+
+    async savePluginData() {
+        // Register a new interval if the sync frequency changes
+        if (
+            this.data.settings.syncConfiguration.syncFrequency !=
+            this.syncInterval.value
+        ) {
+            window.clearInterval(this.syncInterval.intervalRefreshId);
+            this.syncInterval.value =
+                this.data.settings.syncConfiguration.syncFrequency;
+            this.syncInterval.intervalRefreshId = this.setIntervalRefresh();
+        }
+
+        await this.saveData(this.data);
     }
 
     private createKnowledgeBase() {
-        this.knowledgeBase = knowledgeBaseFactory(this.settings);
+        this.knowledgeBase = knowledgeBaseFactory(this.data.settings);
     }
 }

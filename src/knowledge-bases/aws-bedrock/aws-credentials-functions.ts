@@ -101,5 +101,5 @@ function refreshCredentials(profile: string): AwsCredentialIdentity {
         };
     }
 
-    throw new Error('Cannot find profile in credentials file');
+    throw 'Cannot find profile in credentials file';
 }

@@ -13,7 +13,7 @@ export function tryCatchInNotice(prefix?: string) {
             try {
                 return await originalMethod.apply(this, args);
             } catch (error) {
-                new Notice(`${prefix ?? 'Knoledge Base error:'} ${error}`);
+                new Notice(`${prefix ?? 'Knoledge Base error'}: ${error}`);
             }
         };
 
