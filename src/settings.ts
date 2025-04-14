@@ -21,7 +21,6 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
         region: 'us-west-2',
         knowledgeBaseId: '',
         s3BucketName: '',
-        s3Prefix: '',
     },
     syncConfiguration: {
         refreshFrequency: 60,
@@ -87,24 +86,6 @@ export class KBSettingTab extends PluginSettingTab {
                     )
                     .onChange(async (value) => {
                         this.plugin.settings.providerConfiguration.s3BucketName =
-                            value;
-                        await this.plugin.saveSettings();
-                    })
-            );
-
-        new Setting(containerEl)
-            .setName('S3 Prefix')
-            .setDesc(
-                'The prefix of the folder in the S3 bucket where to store the data'
-            )
-            .addText((text) =>
-                text
-                    .setPlaceholder('data/...')
-                    .setValue(
-                        this.plugin.settings.providerConfiguration.s3Prefix
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.providerConfiguration.s3Prefix =
                             value;
                         await this.plugin.saveSettings();
                     })

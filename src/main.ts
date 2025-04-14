@@ -2,6 +2,7 @@ import { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
 import { KnowledgeBase, knowledgeBaseFactory } from './knowledge-bases';
+import { tryCatchInNotice } from './obsidian-functions';
 
 export interface SyncProps {
     allVault?: boolean; // Default: false
@@ -87,6 +88,7 @@ export default class KnowledgeBasePlugin extends Plugin {
 
     onunload() {}
 
+    @tryCatchInNotice('Error syncing Knowledge Base')
     async sync(props?: SyncProps) {
         console.log('Syncing Knowledge Base');
         const { syncId } = await this.knowledgeBase.startSync({

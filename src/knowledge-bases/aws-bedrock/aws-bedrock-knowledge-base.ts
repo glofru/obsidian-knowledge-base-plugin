@@ -1,25 +1,20 @@
 import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
-import {
-    DeleteObjectCommand,
-    DeleteObjectCommandInput,
-    PutObjectCommand,
-    PutObjectCommandInput,
-    S3Client,
-} from '@aws-sdk/client-s3';
-import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
+import { S3Client } from '@aws-sdk/client-s3';
 import {
     KnowledgeBase,
     StartSyncProps,
     StartSyncResponse,
     SyncStatus,
     SyncStatusResponse,
-} from './knowledge-base';
-import { TFile } from 'obsidian';
+} from '../knowledge-base';
 
 import * as fs from 'fs';
 import * as os from 'os';
 import { AwsCredentialIdentity } from '@aws-sdk/types';
 import * as path from 'path';
+import { uploadChangesToS3 } from './aws-s3-functions';
+import { KendraClient } from '@aws-sdk/client-kendra';
+import { syncKnowledgeBase } from './aws-knowledge-base-functions';
 
 /**
  * Decorator factory that refreshes AWS credentials before method execution
@@ -43,7 +38,7 @@ function refreshAwsCredentials(profile: string) {
             });
 
             // Refresh Bedrock Runtime client
-            this.bedrockRuntimeClient = new BedrockAgentRuntimeClient({
+            this.kendraClient = new KendraClient({
                 region: this.configuration.region,
                 credentials: credentials,
             });
@@ -116,12 +111,11 @@ export interface AWSBedrockKnowledgeBaseConfiguration {
     region: string;
     knowledgeBaseId: string;
     s3BucketName: string;
-    s3Prefix: string;
 }
 
 export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     private bedrockClient: BedrockAgentClient;
-    private bedrockRuntimeClient: BedrockAgentRuntimeClient;
+    private kendraClient: KendraClient;
     private s3Client: S3Client;
 
     constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {
@@ -146,80 +140,25 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         return '';
     }
 
-    private prepareS3Deletions(paths: string[]): DeleteObjectCommandInput[] {
-        const deletions: DeleteObjectCommandInput[] = [];
-
-        for (const path of paths) {
-            deletions.push({
-                Bucket: this.configuration.s3BucketName,
-                Key: path,
-            });
-        }
-
-        return deletions;
-    }
-
-    private async prepareS3Changes(
-        files: TFile[]
-    ): Promise<PutObjectCommandInput[]> {
-        const uploads: PutObjectCommandInput[] = [];
-
-        for (const file of files) {
-            const content = await file.vault.read(file);
-            uploads.push({
-                Bucket: this.configuration.s3BucketName,
-                Key: file.path,
-                Body: content,
-            });
-        }
-
-        return uploads;
-    }
-
-    private async uploadChangesToS3({
-        changedFiles,
-        deletedFiles,
-    }: StartSyncProps) {
-        console.log(deletedFiles);
-
-        const deletions = this.prepareS3Deletions(deletedFiles);
-        const deletionPromises = deletions.map((deletion) =>
-            this.s3Client.send(new DeleteObjectCommand(deletion))
-        );
-
-        try {
-            await Promise.all(deletionPromises);
-
-            console.log(
-                `Successfully deleted ${deletions.length} files from S3`
-            );
-        } catch (error) {
-            console.error(`Error deleting files from S3:`, error);
-            throw new Error(`Error deleting files from S3: ${error.message}`);
-        }
-
-        const uploads = await this.prepareS3Changes(changedFiles);
-
-        const uploadPromises = uploads.map((upload) =>
-            this.s3Client.send(new PutObjectCommand(upload))
-        );
-
-        try {
-            await Promise.all(uploadPromises);
-            console.log(`Successfully uploaded ${uploads.length} files to S3`);
-        } catch (error) {
-            console.error(`Error uploading files to S3:`, error);
-            throw new Error(`Error uploading files to S3: ${error.message}`);
-        }
-    }
-
     @refreshAwsCredentials('default')
     async startSync(props: StartSyncProps): Promise<StartSyncResponse> {
-        await this.uploadChangesToS3(props);
+        const { knowledgeBaseId, s3BucketName } = this.configuration;
 
-        return Promise.resolve({
-            syncId: 'test',
+        await uploadChangesToS3({
+            ...props,
+            s3Client: this.s3Client,
+            bucketName: s3BucketName,
         });
+
+        const syncId = await syncKnowledgeBase({
+            knowledgeBaseId,
+            bedrockClient: this.bedrockClient,
+            kendraClient: this.kendraClient,
+        });
+
+        return {
+            syncId,
+        };
     }
 
     //

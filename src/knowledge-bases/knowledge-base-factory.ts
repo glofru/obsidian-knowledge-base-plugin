@@ -1,6 +1,6 @@
 import { KBPluginSettings } from '../settings';
 import { KnowledgeBase, KnowledgeBaseProvider } from './knowledge-base';
-import { AWSBedrockKnowledgeBase } from './aws-bedrock-knowledge-base';
+import { AWSBedrockKnowledgeBase } from './aws-bedrock';
 
 export const knowledgeBaseFactory = ({
     provider,
