@@ -24,11 +24,33 @@ export interface SyncStatusResponse {
     status: SyncStatus;
 }
 
+export interface QueryProps {
+    text: string;
+    chatId: string;
+}
+
+export interface QueryCitation {
+    messagePart: { start?: number; end?: number };
+    references: {
+        fileName: string;
+    }[];
+}
+
+export interface QueryResponse {
+    text: string;
+    citations: QueryCitation[];
+}
+
 export abstract class KnowledgeBase {
     abstract startSync(props: StartSyncProps): Promise<StartSyncResponse>;
-    abstract getSyncStatus(syncId: string): Promise<SyncStatusResponse>;
+    abstract getSyncStatus(
+        props: StartSyncResponse
+    ): Promise<SyncStatusResponse>;
 
-    abstract query(text: string): string;
+    abstract query(props: QueryProps): Promise<QueryResponse>;
+    abstract queryStream(
+        props: QueryProps
+    ): AsyncGenerator<QueryResponse, void, unknown>;
 
     abstract deleteAllData(): Promise<void>;
 }

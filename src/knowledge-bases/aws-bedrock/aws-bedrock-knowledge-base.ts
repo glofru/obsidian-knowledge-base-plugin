@@ -2,110 +2,23 @@ import { BedrockAgentClient } from '@aws-sdk/client-bedrock-agent';
 import { S3Client } from '@aws-sdk/client-s3';
 import {
     KnowledgeBase,
+    QueryProps,
+    QueryResponse,
     StartSyncProps,
     StartSyncResponse,
     SyncStatus,
     SyncStatusResponse,
 } from '../knowledge-base';
 
-import * as fs from 'fs';
-import * as os from 'os';
-import { AwsCredentialIdentity } from '@aws-sdk/types';
-import * as path from 'path';
 import { uploadChangesToS3 } from './aws-s3-functions';
 import { KendraClient } from '@aws-sdk/client-kendra';
 import { syncKnowledgeBase } from './aws-knowledge-base-functions';
-
-/**
- * Decorator factory that refreshes AWS credentials before method execution
- */
-function refreshAwsCredentials(profile: string) {
-    return function (
-        target: any,
-        propertyKey: string,
-        descriptor: PropertyDescriptor
-    ) {
-        const originalMethod = descriptor.value;
-
-        descriptor.value = async function (...args: any[]) {
-            // Refresh the credentials before method execution
-            const credentials = await refreshCredentials(profile);
-
-            // Refresh Bedrock client
-            this.bedrockClient = new BedrockAgentClient({
-                region: this.configuration.region,
-                credentials: credentials,
-            });
-
-            // Refresh Bedrock Runtime client
-            this.kendraClient = new KendraClient({
-                region: this.configuration.region,
-                credentials: credentials,
-            });
-
-            // Refresh S3 client
-            this.s3Client = new S3Client({
-                region: this.configuration.region,
-                credentials: credentials,
-            });
-
-            // Execute the original method with the refreshed credentials
-            return originalMethod.apply(this, args);
-        };
-
-        return descriptor;
-    };
-}
-
-const parseIni = (
-    input: string
-): {
-    [key: string]: string | { [key: string]: string };
-} => {
-    const result: { [key: string]: string | { [key: string]: string } } = {};
-    let section = result;
-
-    input.split('\n').forEach((line) => {
-        let match;
-        if ((match = line.match(/^\s*\[\s*([^\]]*)\s*\]\s*$/))) {
-            section = result[match[1]] = {};
-        } else if ((match = line.match(/^\s*([^=]+?)\s*=\s*(.*?)\s*$/))) {
-            section[match[1]] = match[2];
-        }
-    });
-
-    return result;
-};
-
-/**
- * Refresh AWS credentials using the AWS SDK
- */
-function refreshCredentials(profile: string): AwsCredentialIdentity {
-    const filePath = path.join(os.homedir(), '.aws', 'credentials'); // TODO: make it setting
-
-    if (!fs.existsSync(filePath)) {
-        throw 'Cannot find AWS credentials file';
-    }
-
-    const content = fs.readFileSync(filePath).toString('utf8');
-    const credentialsContent = parseIni(content);
-
-    for (const [profileName, data] of Object.entries(credentialsContent)) {
-        if (profileName !== profile) {
-            continue;
-        }
-
-        const credentialsData = data as any;
-
-        return {
-            accessKeyId: credentialsData.aws_access_key_id,
-            secretAccessKey: credentialsData.aws_secret_access_key,
-            sessionToken: credentialsData.aws_session_token,
-        };
-    }
-
-    throw new Error('Cannot find profile in credentials file');
-}
+import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
+import { refreshAwsCredentials } from './aws-credentials-functions';
+import {
+    retrieveAndGenerate,
+    retrieveAndGenerateStream,
+} from './aws-bedrock-runtime-functions';
 
 export interface AWSBedrockKnowledgeBaseConfiguration {
     region: string;
@@ -115,8 +28,11 @@ export interface AWSBedrockKnowledgeBaseConfiguration {
 
 export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     private bedrockClient: BedrockAgentClient;
+    private bedrockRuntimeClient: BedrockAgentRuntimeClient;
     private kendraClient: KendraClient;
     private s3Client: S3Client;
+
+    private chatToSessionId = new Map<string, string>();
 
     constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {
         super();
@@ -128,16 +44,87 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     }
 
     @refreshAwsCredentials('default')
-    getSyncStatus(syncId: string): Promise<SyncStatusResponse> {
+    getSyncStatus({ syncId }: StartSyncResponse): Promise<SyncStatusResponse> {
         return Promise.resolve({
-            syncId: 'test',
+            syncId,
             status: SyncStatus.SUCCEED,
         });
     }
 
     @refreshAwsCredentials('default')
-    query(text: string): string {
-        return '';
+    async query({ text, chatId }: QueryProps): Promise<QueryResponse> {
+        const sessionId = this.chatToSessionId.get(chatId);
+
+        const {
+            output,
+            citations,
+            sessionId: newSessionId,
+        } = await retrieveAndGenerate({
+            knowledgeBaseId: this.configuration.knowledgeBaseId,
+            bedrockRuntimeClient: this.bedrockRuntimeClient,
+            modelArn: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+            text,
+            sessionId,
+        });
+
+        if (!output || !output.text) {
+            console.error('No response output received from Bedrock Runtime');
+            throw new Error('No response output from Bedrock Runtime');
+        }
+
+        this.chatToSessionId.set(chatId, newSessionId ?? sessionId ?? '');
+
+        console.log(citations);
+
+        return {
+            text: output.text,
+            citations:
+                citations?.map(
+                    ({ generatedResponsePart, retrievedReferences }) => ({
+                        messagePart:
+                            generatedResponsePart?.textResponsePart?.span ?? {},
+                        references:
+                            retrievedReferences?.map(({ location }) => ({
+                                fileName: decodeURIComponent(
+                                    location?.kendraDocumentLocation?.uri
+                                        ?.split('/')
+                                        .last() ?? ''
+                                ),
+                            })) ?? [],
+                    })
+                ) ?? [],
+        };
+    }
+
+    @refreshAwsCredentials('default')
+    async *queryStream({
+        text,
+        chatId,
+    }: QueryProps): AsyncGenerator<QueryResponse, void, unknown> {
+        const sessionId = this.chatToSessionId.get(chatId);
+
+        const { stream, sessionId: newSessionId } =
+            await retrieveAndGenerateStream({
+                knowledgeBaseId: this.configuration.knowledgeBaseId,
+                bedrockRuntimeClient: this.bedrockRuntimeClient,
+                modelArn: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+                text,
+                sessionId,
+            });
+
+        if (!stream) {
+            console.error('No response stream received from Bedrock Runtime');
+            throw new Error('No response stream from Bedrock Runtime');
+        }
+
+        this.chatToSessionId.set(chatId, newSessionId ?? sessionId ?? '');
+
+        for await (const { output, citation } of stream) {
+            if (citation) {
+                console.log(citation);
+            }
+            yield { text: output?.text ?? '', citations: [] };
+        }
     }
 
     @refreshAwsCredentials('default')

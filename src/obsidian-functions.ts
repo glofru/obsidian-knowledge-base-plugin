@@ -1,4 +1,5 @@
 import { Notice } from 'obsidian';
+export { v4 as generateUUID } from 'uuid';
 
 export function tryCatchInNotice(prefix?: string) {
     return function (

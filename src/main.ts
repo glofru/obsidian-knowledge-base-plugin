@@ -2,7 +2,8 @@ import { Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
 import { KnowledgeBase, knowledgeBaseFactory } from './knowledge-bases';
-import { tryCatchInNotice } from './obsidian-functions';
+import { generateUUID, tryCatchInNotice } from './obsidian-functions';
+import { ChatView, VIEW_TYPE_CHAT } from './chat';
 
 export interface SyncProps {
     allVault?: boolean; // Default: false
@@ -20,6 +21,15 @@ export default class KnowledgeBasePlugin extends Plugin {
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new KBSettingTab(this.app, this));
+
+        this.registerView(
+            VIEW_TYPE_CHAT,
+            (leaf) => new ChatView(leaf, { knowledgeBase: this.knowledgeBase })
+        );
+
+        this.addRibbonIcon('brain', `Open ${ChatView.TITLE}`, () => {
+            this.activateChatView();
+        });
 
         // When registering intervals, this function will automatically clear the interval when the plugin is disabled.
         // this.registerInterval(window.setInterval(() => this.sync(), 2 * 1000));
@@ -88,8 +98,35 @@ export default class KnowledgeBasePlugin extends Plugin {
 
     onunload() {}
 
+    private async activateChatView() {
+        const leaf = this.app.workspace.getRightLeaf(false);
+
+        if (!leaf) {
+            return;
+        }
+
+        await leaf.setViewState({
+            type: VIEW_TYPE_CHAT,
+            active: true,
+            state: {
+                chatId: generateUUID(),
+                messages: [],
+            },
+        });
+
+        await this.app.workspace.revealLeaf(leaf);
+    }
+
+    @tryCatchInNotice('Error querying Knowledge Base')
+    async query(props: { text: string; chatId: string }) {
+        const { text, chatId } = props;
+        const response = await this.knowledgeBase.query({ text, chatId });
+        return response.text;
+    }
+
     @tryCatchInNotice('Error syncing Knowledge Base')
     async sync(props?: SyncProps) {
+        // TODO: implement props allVault
         console.log('Syncing Knowledge Base');
         const { syncId } = await this.knowledgeBase.startSync({
             changedFiles: this.fileChangesTracker.getChangedFiles(),
@@ -97,6 +134,11 @@ export default class KnowledgeBasePlugin extends Plugin {
         });
         this.fileChangesTracker.reset();
         console.log(`Start syncing Knowledge Base: ${syncId}`);
+    }
+
+    @tryCatchInNotice('Error deleting Knowledge Base')
+    async deleteAllData() {
+        // TODO
     }
 
     private async loadSettings() {
