@@ -16,6 +16,7 @@ import { syncKnowledgeBase } from './aws-knowledge-base-functions';
 import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime';
 import { refreshAwsCredentials } from './aws-credentials-functions';
 import {
+    citationEventToQueryCitation,
     retrieveAndGenerate,
     retrieveAndGenerateStream,
 } from './aws-bedrock-runtime-functions';
@@ -78,21 +79,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
 
         return {
             text: output.text,
-            citations:
-                citations?.map(
-                    ({ generatedResponsePart, retrievedReferences }) => ({
-                        messagePart:
-                            generatedResponsePart?.textResponsePart?.span ?? {},
-                        references:
-                            retrievedReferences?.map(({ location }) => ({
-                                fileName: decodeURIComponent(
-                                    location?.kendraDocumentLocation?.uri
-                                        ?.split('/')
-                                        .last() ?? ''
-                                ),
-                            })) ?? [],
-                    })
-                ) ?? [],
+            citations: citations?.map(citationEventToQueryCitation) ?? [],
         };
     }
 
@@ -120,10 +107,12 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         this.chatToSessionId.set(chatId, newSessionId ?? sessionId ?? '');
 
         for await (const { output, citation } of stream) {
-            if (citation) {
-                console.log(citation);
-            }
-            yield { text: output?.text ?? '', citations: [] };
+            yield {
+                text: output?.text ?? '',
+                citations: citation
+                    ? [citationEventToQueryCitation(citation)]
+                    : [],
+            };
         }
     }
 

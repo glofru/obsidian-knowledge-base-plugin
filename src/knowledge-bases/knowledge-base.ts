@@ -29,11 +29,13 @@ export interface QueryProps {
     chatId: string;
 }
 
+export interface QueryCitationReference {
+    fileName: string;
+}
+
 export interface QueryCitation {
     messagePart: { start?: number; end?: number };
-    references: {
-        fileName: string;
-    }[];
+    references: QueryCitationReference[];
 }
 
 export interface QueryResponse {

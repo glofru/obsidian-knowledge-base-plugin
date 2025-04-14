@@ -74,3 +74,8 @@
 	cursor: pointer;
 }
 
+.citation-link {
+	color: var(--text-normal);
+	text-decoration: underline dotted;
+	font-size: 0.85em;
+}

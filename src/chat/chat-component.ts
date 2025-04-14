@@ -1,9 +1,58 @@
 import { setIcon } from 'obsidian';
+import { QueryCitation, QueryCitationReference } from '../knowledge-bases';
 
 type SendCallback = (message: string) => Promise<void>;
+type CitationReferenceCallback = (reference: QueryCitationReference) => void;
+
+const renderMessageWithCitations = (
+    text: string,
+    citations: QueryCitation[],
+    citationReferenceCallback: CitationReferenceCallback
+): DocumentFragment => {
+    const fragment = document.createDocumentFragment();
+
+    let currentIndex = 0;
+    let referenceIndex = 1;
+
+    for (const citation of citations) {
+        const { start = 0, end = 0 } = citation.messagePart;
+
+        // Add text before this citation if any
+        if (start > currentIndex) {
+            const plainText = text.slice(currentIndex, start);
+            fragment.appendChild(document.createTextNode(plainText));
+        }
+
+        // Add the cited part of the message
+        const citedText = text.slice(start, end);
+        const span = document.createElement('span');
+        span.textContent = citedText;
+
+        // Append citation links
+        for (const reference of citation.references) {
+            const link = document.createElement('a');
+            link.textContent = `[${referenceIndex++}]`;
+            link.classList.add('citation-link');
+            link.style.marginLeft = '6px';
+            link.onclick = () => citationReferenceCallback(reference);
+            span.appendChild(link);
+        }
+
+        fragment.appendChild(span);
+        currentIndex = end;
+    }
+
+    // Add any remaining text after the last citation
+    if (currentIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(currentIndex)));
+    }
+
+    return fragment;
+};
 
 export interface ChatMessage {
     messageId: string;
+    citations?: QueryCitation[];
     text: string;
     role: 'user' | 'assistant';
 }
@@ -11,6 +60,7 @@ export interface ChatMessage {
 export interface ChatComponentProps {
     messages: ChatMessage[];
     onSendMessage: SendCallback;
+    onClickReference: CitationReferenceCallback;
 }
 
 export class ChatComponent {
@@ -31,6 +81,7 @@ export class ChatComponent {
         this.inputEl.classList.add('chat-input');
 
         const sendButton = inputWrapper.createEl('button', { text: 'Send' });
+        setIcon(sendButton, 'send-horizontal');
         sendButton.classList.add('chat-send-button');
 
         sendButton.onclick = () => this.handleSend();
@@ -49,12 +100,21 @@ export class ChatComponent {
         }
     }
 
-    appendMessage({ role, text, messageId }: ChatMessage) {
+    appendMessage({ role, text, messageId, citations }: ChatMessage) {
         const bubble = this.chatLog.createDiv('chat-bubble ' + role);
 
         const content = bubble.createDiv('chat-content ' + role);
         content.setAttr('message-id', messageId);
-        content.setText(text || 'Generating...');
+        const messageText = text || 'Generating...';
+        content.setText(
+            citations
+                ? renderMessageWithCitations(
+                      messageText,
+                      citations,
+                      this.props.onClickReference
+                  )
+                : messageText
+        );
 
         const actions = bubble.createDiv(`chat-actions`);
         const copyButton = actions.createEl('button', {
@@ -73,11 +133,24 @@ export class ChatComponent {
         this.chatLog.scrollTop = this.chatLog.scrollHeight;
     }
 
-    updateMessage({ messageId, text }: ChatMessage) {
+    updateMessage({ messageId, text, citations }: ChatMessage) {
         const bubble = this.findBubble(messageId);
-        if (bubble) {
-            bubble.setText(text);
+        if (!bubble) {
+            return;
         }
+
+        if (!citations) {
+            bubble.setText(text);
+            return;
+        }
+
+        bubble.setText(
+            renderMessageWithCitations(
+                text,
+                citations,
+                this.props.onClickReference
+            )
+        );
     }
 
     private findBubble(messageId: string): HTMLElement | null {

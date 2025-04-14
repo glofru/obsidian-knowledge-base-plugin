@@ -13,6 +13,9 @@ export interface KBPluginSettings {
         excludedFolders: string[];
         excludedFileExtensions: string[];
     };
+    behaviourConfiguration: {
+        createNewChatOnRibbonClick: boolean;
+    };
 }
 
 export const DEFAULT_SETTINGS: KBPluginSettings = {
@@ -26,6 +29,9 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
         refreshFrequency: 60,
         excludedFolders: [],
         excludedFileExtensions: [],
+    },
+    behaviourConfiguration: {
+        createNewChatOnRibbonClick: true,
     },
 };
 
@@ -163,6 +169,28 @@ export class KBSettingTab extends PluginSettingTab {
             );
     }
 
+    private generateBehaviourConfiguration = (containerEl: HTMLElement) => {
+        new Setting(this.containerEl)
+            .setName('Behaviour Configuration')
+            .setHeading();
+
+        new Setting(containerEl)
+            .setName('Create New Chat on Ribbon Click')
+            .setDesc('Create a new chat when clicking on the ribbon')
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(
+                        this.plugin.settings.behaviourConfiguration
+                            .createNewChatOnRibbonClick
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.behaviourConfiguration.createNewChatOnRibbonClick =
+                            value;
+                        await this.plugin.saveSettings();
+                    })
+            );
+    };
+
     display(): void {
         const { containerEl } = this;
 
@@ -197,5 +225,7 @@ export class KBSettingTab extends PluginSettingTab {
         }
 
         this.generateSyncConfiguration(containerEl);
+
+        this.generateBehaviourConfiguration(containerEl);
     }
 }

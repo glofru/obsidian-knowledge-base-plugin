@@ -99,6 +99,18 @@ export default class KnowledgeBasePlugin extends Plugin {
     onunload() {}
 
     private async activateChatView() {
+        // Don't create a new chat if enabled in settings and chat available
+        if (!this.settings.behaviourConfiguration.createNewChatOnRibbonClick) {
+            const existingLeaf =
+                this.app.workspace.getLeavesOfType(VIEW_TYPE_CHAT)[0];
+
+            if (existingLeaf) {
+                await this.app.workspace.revealLeaf(existingLeaf);
+                return;
+            }
+        }
+
+        // Create new chat
         const leaf = this.app.workspace.getRightLeaf(false);
 
         if (!leaf) {

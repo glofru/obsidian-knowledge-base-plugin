@@ -1,10 +1,12 @@
 import {
     BedrockAgentRuntimeClient,
+    CitationEvent,
     RetrieveAndGenerateCommand,
     RetrieveAndGenerateCommandOutput,
     RetrieveAndGenerateStreamCommand,
     RetrieveAndGenerateStreamCommandOutput,
 } from '@aws-sdk/client-bedrock-agent-runtime';
+import { QueryCitation } from '../knowledge-base';
 
 export interface RetrieveAndGenerateProps {
     bedrockRuntimeClient: BedrockAgentRuntimeClient;
@@ -61,3 +63,19 @@ export const retrieveAndGenerateStream = async ({
 
     return await bedrockRuntimeClient.send(command);
 };
+
+export const citationEventToQueryCitation = ({
+    generatedResponsePart,
+    retrievedReferences,
+}: CitationEvent): QueryCitation => ({
+    messagePart: generatedResponsePart?.textResponsePart?.span ?? {},
+    references:
+        retrievedReferences?.map(({ location }) => ({
+            fileName: decodeURIComponent(
+                location?.kendraDocumentLocation?.uri
+                    ?.split('/')
+                    .slice(3)
+                    .join('/') ?? ''
+            ),
+        })) ?? [],
+});
