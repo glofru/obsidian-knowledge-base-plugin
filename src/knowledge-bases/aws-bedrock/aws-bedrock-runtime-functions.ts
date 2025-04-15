@@ -70,12 +70,20 @@ export const citationEventToQueryCitation = ({
 }: CitationEvent): QueryCitation => ({
     messagePart: generatedResponsePart?.textResponsePart?.span ?? {},
     references:
-        retrievedReferences?.map(({ location }) => ({
-            fileName: decodeURIComponent(
-                location?.kendraDocumentLocation?.uri
-                    ?.split('/')
-                    .slice(3)
-                    .join('/') ?? ''
-            ),
-        })) ?? [],
+        retrievedReferences?.map(({ location }) => {
+            const startIndex =
+                location?.kendraDocumentLocation?.uri?.startsWith(
+                    'https://s3.us-west-2.amazonaws'
+                )
+                    ? 4
+                    : 3;
+            return {
+                fileName: decodeURIComponent(
+                    location?.kendraDocumentLocation?.uri
+                        ?.split('/')
+                        .slice(startIndex)
+                        .join('/') ?? ''
+                ),
+            };
+        }) ?? [],
 });
