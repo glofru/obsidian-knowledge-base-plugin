@@ -11,6 +11,27 @@ export class AWSBedrockSetting {
     // Configuration needed for AWS credentials
     constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {}
 
+    private download = async (plugin: KnowledgeBasePlugin, path: string) => {
+        const json = await plugin.app.vault.adapter.read(
+            plugin.manifest.dir + path
+        );
+        const url = URL.createObjectURL(
+            new Blob([json], {
+                type: 'application/json',
+            })
+        );
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.href = url;
+        a.download = 'template.yml';
+        a.click();
+
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+
     @refreshAwsCredentials('default')
     render(containerEl: HTMLElement, plugin: KnowledgeBasePlugin) {
         new Setting(containerEl).setName('AWS Bedrock').setHeading();
@@ -77,5 +98,22 @@ export class AWSBedrockSetting {
                     )
             );
         });
+
+        new Setting(containerEl)
+            .setName('Download CloudFormation template')
+            .setDesc(
+                'Download the CloudFormation template to deploy the AWS Kendra Knowledge Base'
+            )
+            .addButton((button) =>
+                button
+                    .setButtonText('Download')
+                    .onClick(() =>
+                        this.download(
+                            plugin,
+                            '/attachments/aws-cloudformation-template.yml'
+                        )
+                    )
+                    .setClass('mod-cta')
+            );
     }
 }
