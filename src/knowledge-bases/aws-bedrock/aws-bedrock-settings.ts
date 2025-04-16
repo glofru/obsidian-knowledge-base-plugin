@@ -4,6 +4,8 @@ import { refreshAwsCredentials } from './aws-credentials-functions';
 import { BedrockClient } from '@aws-sdk/client-bedrock';
 import { AWSBedrockKnowledgeBaseConfiguration } from './aws-bedrock-knowledge-base';
 import { listFoundationalModels } from './aws-bedrock-functions';
+// @ts-ignore
+import path from 'path';
 
 export class AWSBedrockSetting {
     private bedrockClient: BedrockClient;
@@ -11,9 +13,12 @@ export class AWSBedrockSetting {
     // Configuration needed for AWS credentials
     constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {}
 
-    private download = async (plugin: KnowledgeBasePlugin, path: string) => {
+    private download = async (
+        plugin: KnowledgeBasePlugin,
+        pathElements: string[]
+    ) => {
         const json = await plugin.app.vault.adapter.read(
-            plugin.manifest.dir + path
+            path.join(plugin.manifest.dir, ...pathElements)
         );
         const url = URL.createObjectURL(
             new Blob([json], {
@@ -108,10 +113,10 @@ export class AWSBedrockSetting {
                 button
                     .setButtonText('Download')
                     .onClick(() =>
-                        this.download(
-                            plugin,
-                            '/attachments/aws-cloudformation-template.yml'
-                        )
+                        this.download(plugin, [
+                            'attachments',
+                            'aws-cloudformation-template.yml',
+                        ])
                     )
                     .setClass('mod-cta')
             );
