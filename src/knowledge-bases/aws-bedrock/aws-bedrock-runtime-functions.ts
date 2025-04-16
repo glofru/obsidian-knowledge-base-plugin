@@ -12,6 +12,7 @@ export interface RetrieveAndGenerateProps {
     bedrockRuntimeClient: BedrockAgentRuntimeClient;
     knowledgeBaseId: string;
     modelArn: string;
+    numberOfResults?: number;
     text: string;
     sessionId?: string;
 }
@@ -44,6 +45,7 @@ export const retrieveAndGenerateStream = async ({
     text,
     sessionId,
     modelArn,
+    numberOfResults,
     knowledgeBaseId,
     bedrockRuntimeClient,
 }: RetrieveAndGenerateProps): Promise<RetrieveAndGenerateStreamCommandOutput> => {
@@ -54,6 +56,11 @@ export const retrieveAndGenerateStream = async ({
         retrieveAndGenerateConfiguration: {
             type: 'KNOWLEDGE_BASE',
             knowledgeBaseConfiguration: {
+                retrievalConfiguration: {
+                    vectorSearchConfiguration: {
+                        numberOfResults,
+                    },
+                },
                 knowledgeBaseId,
                 modelArn: modelArn,
             },

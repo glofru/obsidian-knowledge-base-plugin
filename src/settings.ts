@@ -15,6 +15,7 @@ export interface KBPluginSettings {
         excludedFileExtensions: string[];
     };
     behaviourConfiguration: {
+        numberOfResults: number;
         createNewChatOnRibbonClick: boolean;
     };
 }
@@ -32,6 +33,7 @@ export const DEFAULT_SETTINGS: KBPluginSettings = {
         excludedFileExtensions: [],
     },
     behaviourConfiguration: {
+        numberOfResults: 5,
         createNewChatOnRibbonClick: true,
     },
 };
@@ -125,6 +127,24 @@ export class KBSettingTab extends PluginSettingTab {
         new Setting(this.containerEl)
             .setName('Behaviour configuration')
             .setHeading();
+
+        new Setting(containerEl)
+            .setName('Number of results')
+            .setDesc(
+                'The number of results to the knowledge base considers when querying'
+            )
+            .addText((text) =>
+                text
+                    .setPlaceholder('5')
+                    .setValue(
+                        this.plugin.data.settings.behaviourConfiguration.numberOfResults?.toString()
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.data.settings.behaviourConfiguration.numberOfResults =
+                            parseInt(value);
+                        await this.plugin.savePluginData();
+                    })
+            );
 
         new Setting(containerEl)
             .setName('Create new chat when opening a chat')

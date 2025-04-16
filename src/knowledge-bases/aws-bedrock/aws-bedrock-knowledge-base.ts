@@ -79,7 +79,11 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     }
 
     @refreshAwsCredentials('default')
-    async query({ text, chatId }: QueryProps): Promise<QueryResponse> {
+    async query({
+        text,
+        chatId,
+        numberOfResults,
+    }: QueryProps): Promise<QueryResponse> {
         const sessionId = this.chatToSessionId.get(chatId);
 
         const {
@@ -90,8 +94,9 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
             knowledgeBaseId: this.configuration.knowledgeBaseId,
             bedrockRuntimeClient: this.bedrockRuntimeClient,
             modelArn: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-            text,
+            numberOfResults,
             sessionId,
+            text,
         });
 
         if (!output || !output.text) {
@@ -113,6 +118,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
     async *queryStream({
         text,
         chatId,
+        numberOfResults,
     }: QueryProps): AsyncGenerator<QueryResponse, void, unknown> {
         const sessionId = this.chatToSessionId.get(chatId);
 
@@ -121,8 +127,9 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
                 knowledgeBaseId: this.configuration.knowledgeBaseId,
                 bedrockRuntimeClient: this.bedrockRuntimeClient,
                 modelArn: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-                text,
+                numberOfResults,
                 sessionId,
+                text,
             });
 
         if (!stream) {

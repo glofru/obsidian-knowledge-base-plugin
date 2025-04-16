@@ -26,6 +26,7 @@ export interface SyncStatusResponse {
 
 export interface QueryProps {
     text: string;
+    numberOfResults?: number;
     chatId: string;
 }
 
