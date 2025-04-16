@@ -38,8 +38,22 @@ export class AWSBedrockSetting {
     };
 
     @refreshAwsCredentials('default')
+    private refreshCredentials() {
+        // TODO: need to change the credentials decorator
+    }
+
     render(containerEl: HTMLElement, plugin: KnowledgeBasePlugin) {
         new Setting(containerEl).setName('AWS Bedrock').setHeading();
+
+        try {
+            this.refreshCredentials();
+        } catch (e) {
+            new Setting(containerEl).setDesc(
+                'Cannot find AWS credentials file on .aws/credentials'
+            );
+
+            return;
+        }
 
         new Setting(containerEl)
             .setName('Region')
