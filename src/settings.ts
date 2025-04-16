@@ -82,7 +82,7 @@ export class KBSettingTab extends PluginSettingTab {
                     )
                     .onChange(async (value) => {
                         this.plugin.data.settings.syncConfiguration.excludedFolders =
-                            value.split(', ');
+                            value.split(',').map((element) => element.trim());
                         await this.plugin.savePluginData();
                     })
             );
@@ -102,7 +102,7 @@ export class KBSettingTab extends PluginSettingTab {
                     )
                     .onChange(async (value) => {
                         this.plugin.data.settings.syncConfiguration.excludedFileExtensions =
-                            value.split(', ');
+                            value.split(',').map((element) => element.trim());
                         await this.plugin.savePluginData();
                     })
             );
