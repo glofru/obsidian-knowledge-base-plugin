@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
 import {
@@ -145,7 +145,7 @@ export default class KnowledgeBasePlugin extends Plugin {
         });
         this.fileChangesTracker.reset();
 
-        console.log('Syncing Knowledge Base started');
+        new Notice('Syncing Knowledge Base started');
 
         await this.updateSyncInformation({
             lastSync: new Date().toISOString(),

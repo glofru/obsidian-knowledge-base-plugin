@@ -31,12 +31,16 @@ const prepareS3Changes = async (
     const uploads: PutObjectCommandInput[] = [];
 
     for (const file of files) {
-        const content = await file.vault.read(file);
-        uploads.push({
-            Bucket: bucketName,
-            Key: file.path,
-            Body: content,
-        });
+        try {
+            const content = await file.vault.read(file);
+            uploads.push({
+                Bucket: bucketName,
+                Key: file.path,
+                Body: content,
+            });
+        } catch (error) {
+            console.error(`Error reading file ${file.path}: ${error}`);
+        }
     }
 
     return uploads;
