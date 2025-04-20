@@ -2,6 +2,7 @@ import { TFile } from 'obsidian';
 
 export enum KnowledgeBaseProvider {
     AWS_BEDROCK = 'AWS Bedrock',
+    OLLAMA_CHROMA = 'Ollama Chroma (local)',
 }
 
 export interface StartSyncProps {
