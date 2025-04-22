@@ -2,7 +2,7 @@ import { TFile } from 'obsidian';
 
 export enum KnowledgeBaseProvider {
     AWS_BEDROCK = 'AWS Bedrock',
-    OLLAMA_CHROMA = 'Ollama Chroma (local)',
+    OLLAMA = 'Ollama (local)',
 }
 
 export interface StartSyncProps {
@@ -51,7 +51,6 @@ export abstract class KnowledgeBase {
         props: StartSyncResponse
     ): Promise<SyncStatusResponse>;
 
-    abstract query(props: QueryProps): Promise<QueryResponse>;
     abstract queryStream(
         props: QueryProps
     ): AsyncGenerator<QueryResponse, void, unknown>;

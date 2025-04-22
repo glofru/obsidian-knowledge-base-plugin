@@ -1,7 +1,7 @@
 import { KBPluginSettings } from '../settings';
 import { KnowledgeBase, KnowledgeBaseProvider } from './knowledge-base';
 import { AWSBedrockKnowledgeBase } from './aws-bedrock';
-import { OllamaChromaKnowledgeBase } from './ollama-chroma';
+import { OllamaKnowledgeBase } from './ollama';
 
 export const knowledgeBaseFactory = ({
     provider,
@@ -10,8 +10,8 @@ export const knowledgeBaseFactory = ({
     switch (provider) {
         case KnowledgeBaseProvider.AWS_BEDROCK:
             return new AWSBedrockKnowledgeBase(providerConfiguration);
-        case KnowledgeBaseProvider.OLLAMA_CHROMA:
-            return new OllamaChromaKnowledgeBase();
+        case KnowledgeBaseProvider.OLLAMA:
+            return new OllamaKnowledgeBase();
         default:
             throw `Unknown provider: ${provider}`;
     }

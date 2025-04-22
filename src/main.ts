@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, Vault } from 'obsidian';
 import { DEFAULT_SETTINGS, KBPluginSettings, KBSettingTab } from './settings';
 import { FileChangesTracker } from './file-changes-tracker';
 import {
@@ -27,6 +27,8 @@ export default class KnowledgeBasePlugin extends Plugin {
     fileChangesTracker: FileChangesTracker;
     knowledgeBase: KnowledgeBase;
 
+    static vault: Vault;
+
     private syncInterval = {
         intervalRefreshId: 0,
         statusRefreshId: 0,
@@ -34,6 +36,8 @@ export default class KnowledgeBasePlugin extends Plugin {
     };
 
     async onload() {
+        KnowledgeBasePlugin.vault = this.app.vault;
+
         cacheManager.setOptions({
             ttlSeconds: 30,
         });
@@ -165,11 +169,27 @@ export default class KnowledgeBasePlugin extends Plugin {
                         syncId,
                     });
 
-                    if (status === SyncStatus.SUCCEED) {
-                        await this.updateSyncInformation({
-                            isSyncing: false,
-                        });
-                        window.clearInterval(this.syncInterval.statusRefreshId);
+                    switch (status) {
+                        case SyncStatus.IN_PROGRESS:
+                            break;
+                        case SyncStatus.SUCCEED:
+                            new Notice('Knowledge Base sync succeeded');
+                            await this.updateSyncInformation({
+                                isSyncing: false,
+                            });
+                            window.clearInterval(
+                                this.syncInterval.statusRefreshId
+                            );
+                            break;
+                        case SyncStatus.FAILED:
+                            new Notice('Knowledge Base sync failed');
+                            await this.updateSyncInformation({
+                                isSyncing: false,
+                            });
+                            window.clearInterval(
+                                this.syncInterval.statusRefreshId
+                            );
+                            break;
                     }
                 }, 10 * 1000)
             );
@@ -233,7 +253,11 @@ export default class KnowledgeBasePlugin extends Plugin {
         await this.saveData(this.data);
     }
 
-    private createKnowledgeBase() {
+    createKnowledgeBase() {
         this.knowledgeBase = knowledgeBaseFactory(this.data.settings);
+        this.data.sync = {
+            syncId: '',
+            isSyncing: false,
+        };
     }
 }

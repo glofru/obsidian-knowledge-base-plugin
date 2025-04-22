@@ -187,6 +187,7 @@ export class KBSettingTab extends PluginSettingTab {
                     .setValue(this.plugin.data.settings.provider)
                     .onChange(async (value: KnowledgeBaseProvider) => {
                         this.plugin.data.settings.provider = value;
+                        this.plugin.createKnowledgeBase();
                         await this.plugin.savePluginData();
                         this.display();
                     });
