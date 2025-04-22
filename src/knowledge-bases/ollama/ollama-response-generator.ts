@@ -15,23 +15,16 @@ interface GenerateResponseProps {
     files: TFile[];
 }
 
-interface OllamaMessage {
-    role: string;
-    content: string;
-}
-
-const MODEL = 'llama3.2';
-
 export class OllamaResponseGenerator {
     private chatsHistory: Map<string, BaseMessage[]>;
     private readonly ollama: Ollama;
 
-    constructor() {
+    constructor(model: string) {
         this.chatsHistory = new Map();
 
         this.ollama = new Ollama({
             baseUrl: 'http://localhost:11434', // default Ollama URL
-            model: MODEL,
+            model,
         });
     }
 

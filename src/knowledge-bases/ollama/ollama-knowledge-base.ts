@@ -16,7 +16,12 @@ import { OllamaResponseGenerator } from './ollama-response-generator';
 import { TFile } from 'obsidian';
 import KnowledgeBasePlugin from 'src/main';
 
+const EMBEDDING_MODEL = 'nomic-embed-text';
 const EMBEDDING_SIZE = 768;
+
+export interface OllamaKnowledgeBaseConfiguration {
+    generationModel: string;
+}
 
 export class OllamaKnowledgeBase extends KnowledgeBase {
     private embeddings: OllamaEmbeddings;
@@ -26,14 +31,14 @@ export class OllamaKnowledgeBase extends KnowledgeBase {
     private syncStatuses: Map<string, SyncStatusResponse>;
     private chatMessages: Map<string, string[]>;
 
-    constructor() {
+    constructor({ generationModel }: OllamaKnowledgeBaseConfiguration) {
         super();
         this.embeddings = new OllamaEmbeddings({
-            model: 'nomic-embed-text',
+            model: EMBEDDING_MODEL,
             baseUrl: 'http://localhost:11434',
         });
         this.database = new VectorDatabase(EMBEDDING_SIZE);
-        this.responseGenerator = new OllamaResponseGenerator();
+        this.responseGenerator = new OllamaResponseGenerator(generationModel);
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
             chunkOverlap: 200,

@@ -4,7 +4,12 @@ import {
     KnowledgeBaseConfigurations,
     KnowledgeBaseProvider,
 } from './knowledge-bases';
-import { AWSBedrockSetting } from './knowledge-bases/aws-bedrock';
+import {
+    AWSBedrockKnowledgeBaseConfiguration,
+    AWSBedrockSetting,
+} from './knowledge-bases/aws-bedrock';
+import { OllamaSetting } from './knowledge-bases/ollama/ollama-settings';
+import { OllamaKnowledgeBaseConfiguration } from './knowledge-bases/ollama';
 
 export interface KBPluginSettings {
     provider: KnowledgeBaseProvider;
@@ -20,13 +25,28 @@ export interface KBPluginSettings {
     };
 }
 
+const getDefaultProviderConfiguration = (
+    provider: KnowledgeBaseProvider
+): KnowledgeBaseConfigurations => {
+    switch (provider) {
+        case KnowledgeBaseProvider.AWS_BEDROCK:
+            return {
+                region: 'us-west-2',
+                knowledgeBaseId: '',
+                modelArn: '',
+            } as AWSBedrockKnowledgeBaseConfiguration;
+        case KnowledgeBaseProvider.OLLAMA:
+            return {
+                generationModel: 'llama3.2',
+            } as OllamaKnowledgeBaseConfiguration;
+    }
+};
+
 export const DEFAULT_SETTINGS: KBPluginSettings = {
     provider: KnowledgeBaseProvider.AWS_BEDROCK,
-    providerConfiguration: {
-        region: 'us-west-2',
-        knowledgeBaseId: '',
-        modelArn: '',
-    },
+    providerConfiguration: getDefaultProviderConfiguration(
+        KnowledgeBaseProvider.AWS_BEDROCK
+    ),
     syncConfiguration: {
         syncFrequencyMinutes: 60,
         excludedFolders: [],
@@ -187,19 +207,28 @@ export class KBSettingTab extends PluginSettingTab {
                     .setValue(this.plugin.data.settings.provider)
                     .onChange(async (value: KnowledgeBaseProvider) => {
                         this.plugin.data.settings.provider = value;
+                        this.plugin.data.settings.providerConfiguration =
+                            getDefaultProviderConfiguration(value);
                         this.plugin.createKnowledgeBase();
                         await this.plugin.savePluginData();
                         this.display();
                     });
             });
 
-        if (
-            this.plugin.data.settings.provider ===
-            KnowledgeBaseProvider.AWS_BEDROCK
-        ) {
-            new AWSBedrockSetting(
-                this.plugin.data.settings.providerConfiguration
-            ).render(containerEl, this.plugin);
+        switch (this.plugin.data.settings.provider) {
+            case KnowledgeBaseProvider.OLLAMA:
+                new OllamaSetting().render(containerEl, this.plugin);
+                break;
+            case KnowledgeBaseProvider.AWS_BEDROCK:
+                new AWSBedrockSetting(
+                    this.plugin.data.settings
+                        .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                ).render(containerEl, this.plugin);
+                break;
+            default:
+                new Setting(containerEl)
+                    .setName('Please choose a provider')
+                    .setDesc('The provider is not supported yet');
         }
 
         this.generateSyncConfiguration(containerEl);

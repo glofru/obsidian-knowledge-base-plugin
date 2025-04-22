@@ -63,10 +63,17 @@ export class AWSBedrockSetting {
             .addText((text) =>
                 text
                     .setPlaceholder('us-west-2')
-                    .setValue(plugin.data.settings.providerConfiguration.region)
+                    .setValue(
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).region
+                    )
                     .onChange(async (value) => {
-                        plugin.data.settings.providerConfiguration.region =
-                            value;
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).region = value;
                         await plugin.savePluginData();
                     })
             );
@@ -78,12 +85,16 @@ export class AWSBedrockSetting {
                 text
                     .setPlaceholder('0123456789')
                     .setValue(
-                        plugin.data.settings.providerConfiguration
-                            .knowledgeBaseId
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).knowledgeBaseId
                     )
                     .onChange(async (value) => {
-                        plugin.data.settings.providerConfiguration.knowledgeBaseId =
-                            value;
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).knowledgeBaseId = value;
                         await plugin.savePluginData();
                     })
             );
@@ -102,18 +113,23 @@ export class AWSBedrockSetting {
                         models.reduce(
                             (acc, model) => ({
                                 ...acc,
-                                [model.modelArn!]: model.modelName,
+                                [model.modelArn ?? '']: model.modelName,
                             }),
                             {}
                         )
                     )
                     .onChange(async (value) => {
-                        plugin.data.settings.providerConfiguration.modelArn =
-                            value;
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).modelArn = value;
                         await plugin.savePluginData();
                     })
                     .setValue(
-                        plugin.data.settings.providerConfiguration.modelArn
+                        (
+                            plugin.data.settings
+                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                        ).modelArn
                     )
             );
         });

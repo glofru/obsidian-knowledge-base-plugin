@@ -17,11 +17,10 @@
 		"@aws-sdk/client-bedrock-agent-runtime": "^3.787.0",
 		"@aws-sdk/client-kendra": "^3.787.0",
 		"@aws-sdk/client-s3": "^3.787.0",
+		"@langchain/ollama": "^0.2.0",
 		"@type-cacheable/core": "^14.1.0",
-		"chromadb": "^2.2.1",
 		"date-fns": "^4.1.0",
 		"langchain": "^0.3.23",
-		"@langchain/ollama": "^0.2.0",
 		"uuid": "^11.1.0"
 	},
 	"devDependencies": {

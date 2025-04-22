@@ -1,4 +1,5 @@
 import { AWSBedrockKnowledgeBaseConfiguration } from './aws-bedrock';
+import { OllamaKnowledgeBaseConfiguration } from './ollama';
 
 export {
     KnowledgeBase,
@@ -16,4 +17,6 @@ export type {
 } from './knowledge-base';
 export { knowledgeBaseFactory } from './knowledge-base-factory';
 
-export type KnowledgeBaseConfigurations = AWSBedrockKnowledgeBaseConfiguration;
+export type KnowledgeBaseConfigurations =
+    | AWSBedrockKnowledgeBaseConfiguration
+    | OllamaKnowledgeBaseConfiguration;

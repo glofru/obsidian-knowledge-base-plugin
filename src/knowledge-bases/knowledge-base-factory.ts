@@ -1,7 +1,13 @@
 import { KBPluginSettings } from '../settings';
 import { KnowledgeBase, KnowledgeBaseProvider } from './knowledge-base';
-import { AWSBedrockKnowledgeBase } from './aws-bedrock';
-import { OllamaKnowledgeBase } from './ollama';
+import {
+    AWSBedrockKnowledgeBase,
+    AWSBedrockKnowledgeBaseConfiguration,
+} from './aws-bedrock';
+import {
+    OllamaKnowledgeBase,
+    OllamaKnowledgeBaseConfiguration,
+} from './ollama';
 
 export const knowledgeBaseFactory = ({
     provider,
@@ -9,9 +15,13 @@ export const knowledgeBaseFactory = ({
 }: KBPluginSettings): KnowledgeBase => {
     switch (provider) {
         case KnowledgeBaseProvider.AWS_BEDROCK:
-            return new AWSBedrockKnowledgeBase(providerConfiguration);
+            return new AWSBedrockKnowledgeBase(
+                providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+            );
         case KnowledgeBaseProvider.OLLAMA:
-            return new OllamaKnowledgeBase();
+            return new OllamaKnowledgeBase(
+                providerConfiguration as OllamaKnowledgeBaseConfiguration
+            );
         default:
             throw `Unknown provider: ${provider}`;
     }

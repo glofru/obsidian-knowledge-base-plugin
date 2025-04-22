@@ -11,7 +11,7 @@ import {
 } from '../knowledge-base';
 
 import { uploadChangesToS3 } from './aws-s3-functions';
-import { KendraClient, DataSourceSyncJobStatus } from '@aws-sdk/client-kendra';
+import { DataSourceSyncJobStatus, KendraClient } from '@aws-sdk/client-kendra';
 import {
     getDataSourcesStatus,
     getKnowledgeBaseS3BucketName,
@@ -21,7 +21,6 @@ import { BedrockAgentRuntimeClient } from '@aws-sdk/client-bedrock-agent-runtime
 import { refreshAwsCredentials } from './aws-credentials-functions';
 import {
     citationEventToQueryCitation,
-    retrieveAndGenerate,
     retrieveAndGenerateStream,
 } from './aws-bedrock-runtime-functions';
 
