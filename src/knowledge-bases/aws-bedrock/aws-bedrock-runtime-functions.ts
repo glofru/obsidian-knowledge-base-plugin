@@ -71,6 +71,13 @@ export const retrieveAndGenerateStream = async ({
     return await bedrockRuntimeClient.send(command);
 };
 
+const isS3Url = (url: string | undefined): boolean => {
+    if (!url) {
+        return false;
+    }
+    return /^https:\/\/s3\.[a-z0-9-]+\.amazonaws/.test(url);
+};
+
 export const citationEventToQueryCitation = ({
     generatedResponsePart,
     retrievedReferences,
@@ -78,12 +85,9 @@ export const citationEventToQueryCitation = ({
     messagePart: generatedResponsePart?.textResponsePart?.span ?? {},
     references:
         retrievedReferences?.map(({ location }) => {
-            const startIndex =
-                location?.kendraDocumentLocation?.uri?.startsWith(
-                    'https://s3.us-west-2.amazonaws'
-                )
-                    ? 4
-                    : 3;
+            const startIndex = isS3Url(location?.kendraDocumentLocation?.uri)
+                ? 4
+                : 3;
             return {
                 fileName: decodeURIComponent(
                     location?.kendraDocumentLocation?.uri

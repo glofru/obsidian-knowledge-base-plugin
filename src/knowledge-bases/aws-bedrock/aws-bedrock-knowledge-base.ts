@@ -89,7 +89,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
             await retrieveAndGenerateStream({
                 knowledgeBaseId: this.configuration.knowledgeBaseId,
                 bedrockRuntimeClient: this.bedrockRuntimeClient,
-                modelArn: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+                modelArn: this.configuration.modelArn,
                 numberOfResults,
                 sessionId,
                 text,
