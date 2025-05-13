@@ -1,4 +1,12 @@
-import { ItemView, ViewStateResult, WorkspaceLeaf } from 'obsidian';
+import {
+    App,
+    ItemView,
+    MarkdownView,
+    Notice,
+    TFile,
+    ViewStateResult,
+    WorkspaceLeaf,
+} from 'obsidian';
 import {
     ChatComponent,
     ChatMessage,
@@ -131,6 +139,53 @@ export class ChatView extends ItemView {
         this.chatComponent.setSyncInformation(syncInformation);
     }
 
+    @tryCatchInNotice('Citation error')
+    async openAndSelectText(app: App, filePath: string, textToSelect?: string) {
+        // Open the file
+        const file = app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) {
+            throw new Error(`File ${filePath} not found`);
+        }
+
+        // Open the file in a new leaf (tab)
+        const leaf = app.workspace.getLeaf(false);
+        await leaf.openFile(file);
+
+        if (!textToSelect) {
+            return;
+        }
+
+        // Get the editor
+        const view = app.workspace.getActiveViewOfType(MarkdownView);
+        if (!view) {
+            throw new Error('No active markdown view');
+        }
+
+        const { editor } = view;
+        // Get the content
+        const content = editor.getValue().replace(/\r\n/g, '\n');
+
+        // Decode the text to select
+        const decodedTextToSelect = decodeURIComponent(textToSelect.trim());
+
+        // Find the text position
+        const position = content.indexOf(`${decodedTextToSelect}`);
+
+        if (position === -1) {
+            throw new Error('Text not found in file');
+        }
+
+        // Create the selection
+        const start = editor.offsetToPos(position);
+        const end = editor.offsetToPos(position + textToSelect.length);
+
+        // Set the selection
+        editor.setSelection(start, end);
+
+        // Optionally scroll the selection into view
+        editor.scrollIntoView({ from: start, to: end }, true);
+    }
+
     async onOpen() {
         const container = this.containerEl;
         container.empty();
@@ -141,9 +196,8 @@ export class ChatView extends ItemView {
             messages,
             syncInformation: this.props.syncInformation,
             onSendMessage: (message: string) => this.onSendMessage(message),
-            onClickReference: ({ fileName }: QueryCitationReference) => {
-                this.app.workspace.openLinkText(fileName, '', true);
-            },
+            onClickReference: ({ fileName, text }: QueryCitationReference) =>
+                this.openAndSelectText(this.app, fileName, text),
         });
     }
 }

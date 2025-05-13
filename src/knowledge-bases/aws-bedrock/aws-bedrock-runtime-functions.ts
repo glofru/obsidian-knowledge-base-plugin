@@ -84,7 +84,7 @@ export const citationEventToQueryCitation = ({
 }: CitationEvent): QueryCitation => ({
     messagePart: generatedResponsePart?.textResponsePart?.span ?? {},
     references:
-        retrievedReferences?.map(({ location }) => {
+        retrievedReferences?.map(({ location, content }) => {
             const startIndex = isS3Url(location?.kendraDocumentLocation?.uri)
                 ? 4
                 : 3;
@@ -95,6 +95,7 @@ export const citationEventToQueryCitation = ({
                         .slice(startIndex)
                         .join('/') ?? ''
                 ),
+                text: content?.text,
             };
         }) ?? [],
 });

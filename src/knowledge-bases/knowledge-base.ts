@@ -33,6 +33,7 @@ export interface QueryProps {
 
 export interface QueryCitationReference {
     fileName: string;
+    text?: string;
 }
 
 export interface QueryCitation {

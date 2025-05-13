@@ -125,6 +125,8 @@ export default class KnowledgeBasePlugin extends Plugin {
             throw 'Knowledge Base already syncing';
         }
 
+        new Notice('Starting Knowledge Base syncing...');
+
         // TODO: implement props allVault
         const { syncId } = await this.knowledgeBase.startSync({
             changedFiles: this.fileChangesTracker

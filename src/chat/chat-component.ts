@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 type SendCallback = (message: string) => Promise<void>;
 type CitationReferenceCallback = (reference: QueryCitationReference) => void;
 
-const renderMessageWithCitations = (
+const renderMessage = (
     text: string,
     citations: QueryCitation[],
     citationReferenceCallback: CitationReferenceCallback
@@ -123,7 +123,7 @@ export class ChatComponent {
         const messageText = text || 'Generating...';
         content.setText(
             citations
-                ? renderMessageWithCitations(
+                ? renderMessage(
                       messageText,
                       citations,
                       this.props.onClickReference
@@ -161,7 +161,7 @@ export class ChatComponent {
         }
 
         bubble.setText(
-            renderMessageWithCitations(
+            renderMessage(
                 text,
                 citations,
                 this.props.onClickReference

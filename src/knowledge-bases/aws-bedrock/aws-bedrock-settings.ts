@@ -111,9 +111,9 @@ export class AWSBedrockSetting {
                     .setDisabled(models.length === 0)
                     .addOptions(
                         models.reduce(
-                            (acc, model) => ({
+                            (acc, { modelArn, modelName }) => ({
                                 ...acc,
-                                [model.modelArn ?? '']: model.modelName,
+                                [modelArn ?? '']: modelName,
                             }),
                             {}
                         )
