@@ -19,7 +19,6 @@ export const listFoundationalModels = async ({
     const { modelSummaries } = await bedrockClient.send(command);
 
     if (!modelSummaries) {
-        console.log('C');
         throw 'No foundational models found';
     }
 

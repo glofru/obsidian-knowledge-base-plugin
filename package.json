@@ -16,6 +16,7 @@
 		"@aws-sdk/client-bedrock-agent": "^3.787.0",
 		"@aws-sdk/client-bedrock-agent-runtime": "^3.787.0",
 		"@aws-sdk/client-kendra": "^3.787.0",
+		"@aws-sdk/client-pricing": "^3.787.0",
 		"@aws-sdk/client-s3": "^3.787.0",
 		"@langchain/ollama": "^0.2.0",
 		"@type-cacheable/core": "^14.1.0",

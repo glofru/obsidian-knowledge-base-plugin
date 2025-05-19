@@ -6,16 +6,17 @@ import {
 } from '@aws-sdk/client-bedrock-agent';
 import {
     DataSourceSummary,
+    DataSourceSyncJob,
+    DataSourceSyncJobStatus,
     DescribeDataSourceCommand,
     DescribeDataSourceCommandOutput,
     KendraClient,
     ListDataSourcesCommand,
     ListDataSourceSyncJobsCommand,
     StartDataSourceSyncJobCommand,
-    DataSourceSyncJob,
-    DataSourceSyncJobStatus,
 } from '@aws-sdk/client-kendra';
 import cacheManager from '@type-cacheable/core';
+import { GetProductsCommand, Pricing } from '@aws-sdk/client-pricing';
 
 const SYNC_ID_SEPARATOR = '|';
 
@@ -257,4 +258,61 @@ export const listKnowledgeBases = async ({
     } while (nextToken);
 
     return allKnowledgeBases;
+};
+
+export interface AWSRegion {
+    name: string;
+    code: string;
+}
+
+export const listRegions = async ({
+    pricingClient,
+}: {
+    pricingClient: Pricing;
+}): Promise<AWSRegion[]> => {
+    // List region from the pricing client
+
+    const regions: AWSRegion[] = [];
+    let nextToken: string | undefined;
+
+    try {
+        do {
+            const response = await pricingClient.send(
+                new GetProductsCommand({
+                    ServiceCode: 'AmazonKendra',
+                    Filters: [
+                        {
+                            // @ts-ignore
+                            Type: 'CONTAINS',
+                            Field: 'usagetype',
+                            Value: 'KendraIntelligentRanking',
+                        },
+                    ],
+                    FormatVersion: 'aws_v1',
+                    NextToken: nextToken,
+                })
+            );
+
+            for (const product of response.PriceList ?? []) {
+                const productObj = JSON.parse(product as string);
+                const regionName = productObj.product.attributes?.location;
+                const regionCode = productObj.product.attributes?.regionCode;
+                if (regionName && regionCode) {
+                    regions.push({
+                        name: regionName,
+                        code: regionCode,
+                    });
+                }
+            }
+
+            nextToken = response.NextToken;
+        } while (nextToken);
+
+        regions.sort((a, b) => a.name.localeCompare(b.name));
+
+        return regions;
+    } catch (error) {
+        console.error('Error fetching Kendra regions via Pricing API:', error);
+        throw error;
+    }
 };

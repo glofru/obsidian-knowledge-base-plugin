@@ -25,6 +25,7 @@ import {
 } from './aws-bedrock-runtime-functions';
 
 export interface AWSBedrockKnowledgeBaseConfiguration {
+    profile: string;
     region: string;
     knowledgeBaseId: string;
     modelArn: string;
@@ -42,12 +43,12 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         super();
     }
 
-    @refreshAwsCredentials('default')
+    @refreshAwsCredentials()
     deleteAllData(): Promise<void> {
         return Promise.resolve(undefined);
     }
 
-    @refreshAwsCredentials('default')
+    @refreshAwsCredentials()
     async getSyncStatus({
         syncId,
     }: StartSyncResponse): Promise<SyncStatusResponse> {
@@ -77,7 +78,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         return { syncId, status: SyncStatus.SUCCEED };
     }
 
-    @refreshAwsCredentials('default')
+    @refreshAwsCredentials()
     async *queryStream({
         text,
         chatId,
@@ -112,7 +113,7 @@ export class AWSBedrockKnowledgeBase extends KnowledgeBase {
         }
     }
 
-    @refreshAwsCredentials('default')
+    @refreshAwsCredentials()
     async startSync(props: StartSyncProps): Promise<StartSyncResponse> {
         const { knowledgeBaseId } = this.configuration;
 

@@ -220,10 +220,7 @@ export class KBSettingTab extends PluginSettingTab {
                 new OllamaSetting().render(containerEl, this.plugin);
                 break;
             case KnowledgeBaseProvider.AWS_BEDROCK:
-                new AWSBedrockSetting(
-                    this.plugin.data.settings
-                        .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
-                ).render(containerEl, this.plugin);
+                new AWSBedrockSetting(this.plugin).render(containerEl);
                 break;
             default:
                 new Setting(containerEl)
