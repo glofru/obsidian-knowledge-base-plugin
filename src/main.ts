@@ -42,8 +42,9 @@ export default class KnowledgeBasePlugin extends Plugin {
             ttlSeconds: 30,
         });
         await this.loadPluginData();
-        this.createKnowledgeBase();
         this.fileChangesTracker = new FileChangesTracker(this.app.vault);
+
+        this.createKnowledgeBase();
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new KBSettingTab(this.app, this));
@@ -256,6 +257,9 @@ export default class KnowledgeBasePlugin extends Plugin {
     }
 
     createKnowledgeBase() {
+        this.fileChangesTracker.reset();
+        this.fileChangesTracker.addAllFiles();
+
         this.knowledgeBase = knowledgeBaseFactory(this.data.settings);
         this.data.sync = {
             syncId: '',

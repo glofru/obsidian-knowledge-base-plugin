@@ -6,6 +6,7 @@ export class FileChangesTracker {
 
     constructor(private vault: Vault) {
         this.registerEventListeners();
+        this.addAllFiles();
     }
 
     private registerEventListeners() {
@@ -64,6 +65,12 @@ export class FileChangesTracker {
 
     getDeletePaths(): string[] {
         return Array.from(this.deletePaths);
+    }
+
+    addAllFiles(): void {
+        const files = this.vault.getFiles();
+
+        files.forEach((file) => this.changedFiles.add(file));
     }
 
     reset() {
