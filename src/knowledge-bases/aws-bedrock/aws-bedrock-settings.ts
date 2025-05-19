@@ -1,4 +1,4 @@
-import { Setting } from 'obsidian';
+import { DropdownComponent, Setting } from 'obsidian';
 import KnowledgeBasePlugin from '../../main';
 import { refreshAwsCredentials } from './aws-credentials-functions';
 import { BedrockClient } from '@aws-sdk/client-bedrock';
@@ -6,9 +6,17 @@ import { AWSBedrockKnowledgeBaseConfiguration } from './aws-bedrock-knowledge-ba
 import { listFoundationalModels } from './aws-bedrock-functions';
 // @ts-ignore
 import path from 'path';
+import { listKnowledgeBases } from './aws-knowledge-base-functions';
+import {
+    BedrockAgentClient,
+    KnowledgeBaseSummary,
+} from '@aws-sdk/client-bedrock-agent';
 
 export class AWSBedrockSetting {
     private bedrockClient: BedrockClient;
+    private bedrockAgentClient: BedrockAgentClient;
+
+    private knowledgeBaseDropdown: DropdownComponent | undefined;
 
     // Configuration needed for AWS credentials
     constructor(private configuration: AWSBedrockKnowledgeBaseConfiguration) {}
@@ -41,6 +49,27 @@ export class AWSBedrockSetting {
     private refreshCredentials() {
         // TODO: need to change the credentials decorator
     }
+
+    refreshKnowledgeBases = () => {
+        listKnowledgeBases({
+            bedrockAgentClient: this.bedrockAgentClient,
+        }).then((knowledgeBases) => {
+            if (this.knowledgeBaseDropdown) {
+                this.knowledgeBaseDropdown
+                    .setDisabled(knowledgeBases.length === 0)
+                    .addOptions(
+                        knowledgeBases.reduce(
+                            (acc, { knowledgeBaseId, name }) => ({
+                                ...acc,
+                                [knowledgeBaseId ?? '']:
+                                    `${name} (${knowledgeBaseId})`,
+                            }),
+                            {}
+                        )
+                    );
+            }
+        });
+    };
 
     render(containerEl: HTMLElement, plugin: KnowledgeBasePlugin) {
         new Setting(containerEl).setName('AWS Bedrock').setHeading();
@@ -78,26 +107,35 @@ export class AWSBedrockSetting {
                     })
             );
 
-        new Setting(containerEl)
-            .setName('Knowledge Base ID')
-            .setDesc('The ID of the knowledge base')
-            .addText((text) =>
-                text
-                    .setPlaceholder('0123456789')
-                    .setValue(
-                        (
-                            plugin.data.settings
-                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
-                        ).knowledgeBaseId
-                    )
-                    .onChange(async (value) => {
-                        (
-                            plugin.data.settings
-                                .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
-                        ).knowledgeBaseId = value;
-                        await plugin.savePluginData();
-                    })
-            );
+        const knowledgeBaseSetting = new Setting(containerEl)
+            .setName('Knowledge Base')
+            .setDesc('The ID of the Knowledge Base');
+
+        knowledgeBaseSetting.addDropdown((dropdown) => {
+            this.knowledgeBaseDropdown = dropdown;
+            return dropdown
+                .setDisabled(true)
+                .onChange(async (value) => {
+                    (
+                        plugin.data.settings
+                            .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                    ).knowledgeBaseId = value;
+                    await plugin.savePluginData();
+                })
+                .setValue(
+                    (
+                        plugin.data.settings
+                            .providerConfiguration as AWSBedrockKnowledgeBaseConfiguration
+                    ).knowledgeBaseId
+                );
+        });
+        knowledgeBaseSetting.addButton((button) =>
+            button
+                .setIcon('refresh-cw')
+                .setClass('mod-cta')
+                .onClick(this.refreshKnowledgeBases)
+        );
+        this.refreshKnowledgeBases();
 
         const modelSetting = new Setting(containerEl)
             .setName('Generation model')

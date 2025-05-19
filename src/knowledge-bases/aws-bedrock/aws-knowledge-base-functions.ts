@@ -1,6 +1,8 @@
 import {
     BedrockAgentClient,
     GetKnowledgeBaseCommand,
+    KnowledgeBaseSummary,
+    ListKnowledgeBasesCommand,
 } from '@aws-sdk/client-bedrock-agent';
 import {
     DataSourceSummary,
@@ -220,4 +222,39 @@ export const getDataSourcesStatus = async (
     return syncJobs.map(
         (job) => job?.Status ?? DataSourceSyncJobStatus.SUCCEEDED
     );
+};
+
+export const listKnowledgeBases = async ({
+    bedrockAgentClient,
+}: {
+    bedrockAgentClient: BedrockAgentClient;
+}): Promise<KnowledgeBaseSummary[]> => {
+    let nextToken: string | undefined;
+    let allKnowledgeBases: KnowledgeBaseSummary[] = [];
+
+    do {
+        // Create and send the ListKnowledgeBasesCommand
+        const command = new ListKnowledgeBasesCommand({
+            nextToken,
+        });
+
+        try {
+            const response = await bedrockAgentClient.send(command);
+
+            // Process the response
+            if (response.knowledgeBaseSummaries) {
+                allKnowledgeBases = allKnowledgeBases.concat(
+                    response.knowledgeBaseSummaries
+                );
+            }
+
+            // Update the nextToken for pagination
+            nextToken = response.nextToken;
+        } catch (error) {
+            console.error('Error listing knowledge bases:', error);
+            break;
+        }
+    } while (nextToken);
+
+    return allKnowledgeBases;
 };
