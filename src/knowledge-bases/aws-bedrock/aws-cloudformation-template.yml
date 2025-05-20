@@ -1,13 +1,13 @@
 Parameters:
   BucketName:
     Type: String
-    Description: S3 Bucket Name where to sync your Obsidian vault
+    Description: The name of the S3 Bucket, that is going to be created, where to sync your Obsidian vault. Must be a valid bucket name (all lower case, no space, and restricted special characters).
   KendraIndexName:
     Type: String
-    Description: Name of the Kendra index
+    Description: The name of the Kendra index that is going to be created.
   KnowledgeBaseName:
     Type: String
-    Description: Name of the knowledge base
+    Description: The name of the knowledge base that is going to be created.
 Resources:
   S3SyncBucket63F6745B:
     Type: AWS::S3::Bucket
