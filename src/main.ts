@@ -134,11 +134,18 @@ export default class KnowledgeBasePlugin extends Plugin {
                 .getChangedFiles()
                 .filter(
                     ({ extension, path }) =>
-                        !this.data.settings.syncConfiguration.excludedFileExtensions.contains(
-                            extension
+                        this.data.settings.syncConfiguration
+                            .excludedFileExtensions &&
+                        !this.data.settings.syncConfiguration.excludedFileExtensions.some(
+                            (excludedFileExtension) =>
+                                !!excludedFileExtension &&
+                                extension === excludedFileExtension
                         ) &&
-                        !this.data.settings.syncConfiguration.excludedFolders.contains(
-                            path
+                        this.data.settings.syncConfiguration.excludedFolders &&
+                        !this.data.settings.syncConfiguration.excludedFolders.some(
+                            (excludedFolder) =>
+                                !!excludedFolder &&
+                                path.contains(excludedFolder)
                         )
                 ),
             deletedFiles: this.fileChangesTracker
