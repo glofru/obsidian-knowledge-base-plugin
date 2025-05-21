@@ -51,37 +51,58 @@ export interface S3UploadChangesProps extends StartSyncProps {
     bucketName: string;
 }
 
+// Helper function to split an array into chunks
+const chunkArray = <T>(array: T[], chunkSize: number): T[][] => {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+        chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+};
+
 export const uploadChangesToS3 = async ({
     changedFiles,
     bucketName,
     deletedFiles,
     s3Client,
 }: S3UploadChangesProps) => {
+    const BATCH_SIZE = 50;
+
+    // Process deletions in batches
     const deletions = prepareS3Deletions(deletedFiles, bucketName);
-    const deletionPromises = deletions.map((deletion) =>
-        s3Client.send(new DeleteObjectCommand(deletion))
-    );
+    const deletionBatches = chunkArray(deletions, BATCH_SIZE);
 
     try {
-        await Promise.all(deletionPromises);
-
-        console.log(`Successfully deleted ${deletions.length} files from S3`);
+        for (const batch of deletionBatches) {
+            await Promise.all(
+                batch.map((deletion) =>
+                    s3Client.send(new DeleteObjectCommand(deletion))
+                )
+            );
+        }
+        console.log(
+            `Successfully deleted all ${deletions.length} files from S3`
+        );
     } catch (error) {
-        console.error(`Error deleting files from S3:`, error);
-        throw `Error deleting files from S3: ${error.message}`;
+        console.error('Error deleting files:', error);
+        throw `Error deleting files: ${error.message}`;
     }
 
+    // Process uploads in batches
     const uploads = await prepareS3Changes(changedFiles, bucketName);
-
-    const uploadPromises = uploads.map((upload) =>
-        s3Client.send(new PutObjectCommand(upload))
-    );
+    const uploadBatches = chunkArray(uploads, BATCH_SIZE);
 
     try {
-        await Promise.all(uploadPromises);
-        console.log(`Successfully uploaded ${uploads.length} files to S3`);
+        for (const batch of uploadBatches) {
+            await Promise.all(
+                batch.map((upload) =>
+                    s3Client.send(new PutObjectCommand(upload))
+                )
+            );
+        }
+        console.log(`Successfully uploaded all ${uploads.length} files to S3`);
     } catch (error) {
-        console.error(`Error uploading files to S3:`, error);
-        throw `Error uploading files to S3: ${error.message}`;
+        console.error('Error uploading files:', error);
+        throw `Error uploading files: ${error.message}`;
     }
 };
