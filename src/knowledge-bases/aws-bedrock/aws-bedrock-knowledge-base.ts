@@ -32,6 +32,8 @@ export interface AWSBedrockKnowledgeBaseConfiguration {
 }
 
 export class AWSBedrockKnowledgeBase extends KnowledgeBase {
+    allowQueryWhenNotSynced = true;
+
     private bedrockAgentClient: BedrockAgentClient;
     private bedrockRuntimeClient: BedrockAgentRuntimeClient;
     private kendraClient: KendraClient;

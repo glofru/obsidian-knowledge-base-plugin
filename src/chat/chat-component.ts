@@ -1,6 +1,7 @@
 import { Notice, setIcon } from 'obsidian';
 import { QueryCitation, QueryCitationReference } from '../knowledge-bases';
 import { format } from 'date-fns';
+import { tryCatchInNotice } from '../obsidian-functions';
 
 type SendCallback = (message: string) => Promise<void>;
 type CitationReferenceCallback = (reference: QueryCitationReference) => void;
@@ -161,11 +162,7 @@ export class ChatComponent {
         }
 
         bubble.setText(
-            renderMessage(
-                text,
-                citations,
-                this.props.onClickReference
-            )
+            renderMessage(text, citations, this.props.onClickReference)
         );
     }
 
@@ -181,6 +178,7 @@ export class ChatComponent {
         return this.chatLog.querySelector(`[message-id="${messageId}"]`);
     }
 
+    @tryCatchInNotice('Error querying Knowledge Base')
     private async handleSend() {
         const message = this.inputEl.value.trim();
         if (!message) {
@@ -189,10 +187,9 @@ export class ChatComponent {
 
         this.inputEl.value = '';
 
-        await this.props.onSendMessage(message);
-    }
-
-    private async fakeResponse(prompt: string): Promise<string> {
-        return `Pretend response to: "${prompt}"`;
+        await this.props.onSendMessage(message).catch((e) => {
+            this.inputEl.value = message;
+            throw e;
+        });
     }
 }

@@ -85,10 +85,18 @@ export class ChatView extends ItemView {
         }
     };
 
-    @tryCatchInNotice('Error querying Knowledge Base')
     private async onSendMessage(message: string) {
         if (!this.state) {
             return;
+        }
+
+        const { isSyncing, lastSync } = this.props.syncInformation;
+
+        if (
+            !this.props.knowledgeBase.allowQueryWhenNotSynced &&
+            (isSyncing || !lastSync)
+        ) {
+            throw 'The Knowledge Base type chosen does not allow prompts during syncing, or if never synced. Please sync the Knowledge Base first.';
         }
 
         const userMessage: ChatMessage = {
@@ -172,7 +180,7 @@ export class ChatView extends ItemView {
         const position = content.indexOf(`${decodedTextToSelect}`);
 
         if (position === -1) {
-            throw new Error('Text not found in file');
+            throw new Error(`Text not found in file: ${decodedTextToSelect}`);
         }
 
         // Create the selection

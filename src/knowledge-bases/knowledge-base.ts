@@ -57,4 +57,6 @@ export abstract class KnowledgeBase {
     ): AsyncGenerator<QueryResponse, void, unknown>;
 
     abstract deleteAllData(): Promise<void>;
+
+    abstract allowQueryWhenNotSynced: boolean;
 }

@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT, userPrompt } from '../prompts';
+import { SYSTEM_PROMPT, userPrompt } from './ollama-prompts';
 import {
     AIMessage,
     HumanMessage,
@@ -7,12 +7,12 @@ import {
 import { BaseMessage } from '@langchain/core/dist/messages/base';
 import { Ollama } from '@langchain/ollama';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { TFile } from 'obsidian';
+import { QueryCitationReference } from '../knowledge-base';
 
 interface GenerateResponseProps {
     chatId: string;
     prompt: string;
-    files: TFile[];
+    references: QueryCitationReference[];
 }
 
 export class OllamaResponseGenerator {
@@ -34,10 +34,16 @@ export class OllamaResponseGenerator {
         }
     }
 
-    async *generateResponse({ chatId, prompt, files }: GenerateResponseProps) {
+    async *generateResponse({
+        chatId,
+        prompt,
+        references,
+    }: GenerateResponseProps) {
         this.addChatIfNotExist(chatId);
 
-        const userMessage = new HumanMessage(await userPrompt(prompt, files));
+        const userMessage = new HumanMessage(
+            await userPrompt(prompt, references)
+        );
         const newMessages = [
             ...(this.chatsHistory.get(chatId) ?? []),
             userMessage,
@@ -45,7 +51,6 @@ export class OllamaResponseGenerator {
         this.chatsHistory.set(chatId, newMessages);
 
         // Stream answer
-
         const chatPrompt = ChatPromptTemplate.fromMessages(newMessages);
         const chain = chatPrompt.pipe(this.ollama);
         const stream = await chain.stream(prompt);

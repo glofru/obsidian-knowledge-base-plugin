@@ -11,10 +11,9 @@ import {
     SyncStatusResponse,
 } from '../knowledge-base';
 import { generateUUID } from '../../obsidian-functions';
-import { VectorDatabase } from './vector-database';
+import { OllamaVectorDatabase } from './ollama-vector-database';
 import { OllamaResponseGenerator } from './ollama-response-generator';
-import { TFile } from 'obsidian';
-import KnowledgeBasePlugin from 'src/main';
+import { getCitationSegments } from './ollama-functions';
 
 const EMBEDDING_MODEL = 'nomic-embed-text';
 const EMBEDDING_SIZE = 768;
@@ -24,8 +23,10 @@ export interface OllamaKnowledgeBaseConfiguration {
 }
 
 export class OllamaKnowledgeBase extends KnowledgeBase {
+    allowQueryWhenNotSynced = false;
+
     private embeddings: OllamaEmbeddings;
-    private database: VectorDatabase;
+    private database: OllamaVectorDatabase;
     private responseGenerator: OllamaResponseGenerator;
     private textSplitter: RecursiveCharacterTextSplitter;
     private syncStatuses: Map<string, SyncStatusResponse>;
@@ -37,7 +38,7 @@ export class OllamaKnowledgeBase extends KnowledgeBase {
             model: EMBEDDING_MODEL,
             baseUrl: 'http://localhost:11434',
         });
-        this.database = new VectorDatabase(EMBEDDING_SIZE);
+        this.database = new OllamaVectorDatabase(EMBEDDING_SIZE);
         this.responseGenerator = new OllamaResponseGenerator(generationModel);
         this.textSplitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
@@ -77,12 +78,16 @@ export class OllamaKnowledgeBase extends KnowledgeBase {
                     docs.map(({ pageContent }) => pageContent)
                 );
 
-                const data = docs.map(({ metadata: { source } }, i) => ({
-                    vector: embeddings[i],
-                    filePath: source,
-                }));
+                const data = docs.map(
+                    ({ metadata: { source }, pageContent }, i) => ({
+                        vector: embeddings[i],
+                        filePath: source,
+                        text: pageContent,
+                    })
+                );
 
                 this.database.addVectors(data);
+
                 done += 1;
                 if (done % 10 == 0) {
                     console.log(
@@ -151,9 +156,10 @@ export class OllamaKnowledgeBase extends KnowledgeBase {
         const stream = this.responseGenerator.generateResponse({
             chatId,
             prompt: text,
-            files: results.map(({ filePath }) =>
-                KnowledgeBasePlugin.vault.getAbstractFileByPath(filePath)
-            ) as TFile[],
+            references: results.map(({ filePath, text }) => ({
+                fileName: filePath,
+                text,
+            })),
         });
 
         let assistantResponse = '';
@@ -162,6 +168,24 @@ export class OllamaKnowledgeBase extends KnowledgeBase {
             yield {
                 text: chunk,
                 citations: [],
+            };
+        }
+
+        const citations = getCitationSegments(assistantResponse, results);
+        for (const { start, end, fileName, citation } of citations) {
+            yield {
+                text: '',
+                citations: [
+                    {
+                        messagePart: { start, end },
+                        references: [
+                            {
+                                text: citation,
+                                fileName,
+                            },
+                        ],
+                    },
+                ],
             };
         }
 

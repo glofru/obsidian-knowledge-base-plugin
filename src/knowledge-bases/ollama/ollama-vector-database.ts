@@ -1,19 +1,23 @@
+import * as fs from 'fs';
+
 interface Vector {
     vector: number[];
     filePath: string;
+    text: string;
 }
 
-interface QueryResult {
+export interface QueryResult {
     similarity: number;
     filePath: string;
+    text: string;
 }
 
-export class VectorDatabase {
+export class OllamaVectorDatabase {
     private vectors: Vector[] = [];
     private dimension: number;
 
     /**
-     * Constructor for VectorDatabase
+     * Constructor for OllamaVectorDatabase
      * @param dimension Dimension of the vectors
      */
     constructor(dimension: number) {
@@ -25,7 +29,7 @@ export class VectorDatabase {
      * @param id Unique identifier for the vector
      * @param vector The vector data
      */
-    public addVector({ vector, filePath }: Vector): void {
+    public addVector({ vector, filePath, text }: Vector): void {
         if (this.dimension === null) {
             this.dimension = vector.length;
         }
@@ -36,7 +40,7 @@ export class VectorDatabase {
             );
         }
 
-        this.vectors.push({ vector, filePath });
+        this.vectors.push({ vector, filePath, text });
     }
 
     /**
@@ -92,16 +96,16 @@ export class VectorDatabase {
         }
 
         // Calculate similarities for all vectors
-        const similarities = this.vectors.map(({ vector, filePath }) => ({
+        const similarities = this.vectors.map(({ vector, filePath, text }) => ({
             similarity: this.similarity(queryVector, vector),
             filePath,
+            text,
         }));
 
         // Sort by similarity (descending) and return top k
         return similarities
             .sort((a, b) => b.similarity - a.similarity)
-            .slice(0, k)
-            .map(({ filePath, similarity }) => ({ filePath, similarity }));
+            .slice(0, k);
     }
 
     /**
